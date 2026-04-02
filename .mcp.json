@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "chiebukuro-mcp": {
+      "command": "bundle",
+      "args": ["exec", "ruby", "bin/serve"],
+      "cwd": "/Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db"
+    }
+  }
+}

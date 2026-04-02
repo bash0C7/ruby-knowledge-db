@@ -23,10 +23,10 @@ store    = RubyKnowledgeStore::Store.new(db_path, embedder: embedder)
 
 srcs = config['sources']
 collectors = [
-  PicorubyTrunk::Collector.new(srcs['picoruby_trunk']),
-  CrubyTrunk::Collector.new(srcs['cruby_trunk']),
-  MrubyTrunk::Collector.new(srcs['mruby_trunk']),
-]
+  srcs['picoruby_trunk'] && PicorubyTrunk::Collector.new(srcs['picoruby_trunk']),
+  srcs['cruby_trunk']    && CrubyTrunk::Collector.new(srcs['cruby_trunk']),
+  srcs['mruby_trunk']    && MrubyTrunk::Collector.new(srcs['mruby_trunk']),
+].compact
 
 since = ARGV[0]  # ISO8601 or nil
 orchestrator = RubyKnowledgeDb::Orchestrator.new(store, collectors)
