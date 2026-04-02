@@ -3,6 +3,8 @@
 
 require 'bundler/setup'
 require 'chiebukuro_mcp'
+require 'ruby_knowledge_store'
 
-db_path = File.expand_path('../db/ruby_knowledge.db', __dir__)
-ChiebukuroMcp::Server.new(db_path: db_path).run
+db_path  = File.expand_path('../db/ruby_knowledge.db', __dir__)
+embedder = RubyKnowledgeStore::Embedder.new
+ChiebukuroMcp::Server.new(db_path: db_path, embedder: embedder).run

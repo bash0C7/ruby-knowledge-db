@@ -1,7 +1,9 @@
 require_relative '../../../test/test_helper'
 require_relative '../lib/chiebukuro_mcp/query_tool'
 require_relative '../lib/chiebukuro_mcp/schema_resource'
+require_relative '../lib/chiebukuro_mcp/semantic_search_tool'
 require_relative '../../ruby_knowledge_store/lib/ruby_knowledge_store/migrator'
+require_relative '../../ruby_knowledge_store/lib/ruby_knowledge_store/store'
 require 'tempfile'
 
 class TestQueryTool < Test::Unit::TestCase
@@ -108,6 +110,60 @@ class TestSchemaResourceWithMeta < Test::Unit::TestCase
     schema = resource.call
     assert_include schema, '```sql'
     assert_include schema, '```'
+  end
+end
+
+class TestSemanticSearchTool < Test::Unit::TestCase
+  def setup
+    @tmpfile = Tempfile.new(['test_semantic_search', '.db'])
+    @db_path = @tmpfile.path
+    @tmpfile.close
+
+    migrations_dir = File.expand_path('../../../migrations', __dir__)
+    RubyKnowledgeStore::Migrator.new(@db_path, migrations_dir: migrations_dir).run
+
+    @stub_embedder = StubEmbedder.new
+    store = RubyKnowledgeStore::Store.new(@db_path, embedder: @stub_embedder)
+    store.store('PicoRuby の GPIO クラス', source: 'picoruby/picoruby:docs/gpio')
+    store.store('CRuby の Array クラス', source: 'rurema/doctree:ruby3.3/array')
+    store.store('mruby の Hash クラス', source: 'rurema/doctree:ruby3.3/hash')
+    store.close
+  end
+
+  def teardown
+    @tmpfile.unlink
+  end
+
+  def test_semantic_search_returns_results_with_expected_keys
+    tool = ChiebukuroMcp::SemanticSearchTool.new(@db_path, embedder: @stub_embedder)
+    result = tool.call(query: 'GPIO')
+    parsed = JSON.parse(result)
+    assert parsed.length > 0
+    first = parsed.first
+    assert first.key?('content')
+    assert first.key?('source')
+    assert first.key?('distance')
+  end
+
+  def test_semantic_search_limit_respected
+    tool = ChiebukuroMcp::SemanticSearchTool.new(@db_path, embedder: @stub_embedder)
+    result = tool.call(query: 'Ruby', limit: 2)
+    parsed = JSON.parse(result)
+    assert_equal 2, parsed.length
+  end
+
+  def test_semantic_search_default_limit_is_five
+    store = RubyKnowledgeStore::Store.new(@db_path, embedder: @stub_embedder)
+    store.store('record 4', source: 'test/4')
+    store.store('record 5', source: 'test/5')
+    store.store('record 6', source: 'test/6')
+    store.store('record 7', source: 'test/7')
+    store.close
+
+    tool = ChiebukuroMcp::SemanticSearchTool.new(@db_path, embedder: @stub_embedder)
+    result = tool.call(query: 'Ruby')
+    parsed = JSON.parse(result)
+    assert_equal 5, parsed.length
   end
 end
 
