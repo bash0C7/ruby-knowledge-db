@@ -1,0 +1,169 @@
+GIT
+  remote: https://github.com/rurema/bitclust.git
+  revision: fa0a38eb88bf9f693e50335956c78b504ff7f9eb
+  specs:
+    bitclust-core (1.4.0)
+      drb
+      json
+      nkf
+      progressbar (>= 1.9.0, < 2.0)
+      rack
+      webrick
+
+PATH
+  remote: ../trunk-changes-diary
+  specs:
+    trunk_changes_diary (0.1.0)
+
+PATH
+  remote: gems/chiebukuro_mcp
+  specs:
+    chiebukuro_mcp (0.1.0)
+
+PATH
+  remote: gems/cruby_trunk
+  specs:
+    cruby_trunk (0.1.0)
+
+PATH
+  remote: gems/mruby_trunk
+  specs:
+    mruby_trunk (0.1.0)
+
+PATH
+  remote: gems/picoruby_docs
+  specs:
+    picoruby_docs (0.1.0)
+
+PATH
+  remote: gems/picoruby_trunk
+  specs:
+    picoruby_trunk (0.1.0)
+
+PATH
+  remote: gems/ruby_knowledge_store
+  specs:
+    ruby_knowledge_store (0.1.0)
+
+PATH
+  remote: gems/rurema
+  specs:
+    rurema (0.1.0)
+
+GEM
+  remote: https://rubygems.org/
+  specs:
+    addressable (2.8.9)
+      public_suffix (>= 2.0.2, < 8.0)
+    bigdecimal (4.1.0)
+    drb (2.2.3)
+    ffi (1.17.4-arm64-darwin)
+    ffi (1.17.4-x86_64-darwin)
+    ffi (1.17.4-x86_64-linux-gnu)
+    ffi (1.17.4-x86_64-linux-musl)
+    informers (1.2.1)
+      onnxruntime (>= 0.9)
+      tokenizers (>= 0.5.3)
+    json (2.19.3)
+    json-schema (6.2.0)
+      addressable (~> 2.8)
+      bigdecimal (>= 3.1, < 5)
+    mcp (0.10.0)
+      json-schema (>= 4.1)
+    nkf (0.2.0)
+    onnxruntime (0.11.1-arm64-darwin)
+      ffi
+    onnxruntime (0.11.1-x86_64-darwin)
+      ffi
+    onnxruntime (0.11.1-x86_64-linux)
+      ffi
+    power_assert (3.0.1)
+    progressbar (1.13.0)
+    public_suffix (7.0.5)
+    rack (3.2.6)
+    sqlite-vec (0.1.9-arm64-darwin)
+    sqlite-vec (0.1.9-x86_64-darwin)
+    sqlite-vec (0.1.9-x86_64-linux)
+    sqlite3 (2.9.2-arm64-darwin)
+    sqlite3 (2.9.2-x86_64-darwin)
+    sqlite3 (2.9.2-x86_64-linux-gnu)
+    sqlite3 (2.9.2-x86_64-linux-musl)
+    test-unit (3.7.7)
+      power_assert
+    tokenizers (0.6.3-arm64-darwin)
+    tokenizers (0.6.3-x86_64-darwin)
+    tokenizers (0.6.3-x86_64-linux)
+    tokenizers (0.6.3-x86_64-linux-musl)
+    webrick (1.9.2)
+
+PLATFORMS
+  arm64-darwin
+  x86_64-darwin
+  x86_64-linux
+  x86_64-linux-gnu
+  x86_64-linux-musl
+
+DEPENDENCIES
+  bitclust-core!
+  chiebukuro_mcp!
+  cruby_trunk!
+  informers
+  mcp
+  mruby_trunk!
+  picoruby_docs!
+  picoruby_trunk!
+  ruby_knowledge_store!
+  rurema!
+  sqlite-vec
+  sqlite3
+  test-unit
+  trunk_changes_diary!
+
+CHECKSUMS
+  addressable (2.8.9) sha256=cc154fcbe689711808a43601dee7b980238ce54368d23e127421753e46895485
+  bigdecimal (4.1.0) sha256=6dc07767aa3dc456ccd48e7ae70a07b474e9afd7c5bc576f80bd6da5c8dd6cae
+  bitclust-core (1.4.0)
+  chiebukuro_mcp (0.1.0)
+  cruby_trunk (0.1.0)
+  drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
+  ffi (1.17.4-arm64-darwin) sha256=19071aaf1419251b0a46852abf960e77330a3b334d13a4ab51d58b31a937001b
+  ffi (1.17.4-x86_64-darwin) sha256=aa70390523cf3235096cf64962b709b4cfbd5c082a2cb2ae714eb0fe2ccda496
+  ffi (1.17.4-x86_64-linux-gnu) sha256=9d3db14c2eae074b382fa9c083fe95aec6e0a1451da249eab096c34002bc752d
+  ffi (1.17.4-x86_64-linux-musl) sha256=3fdf9888483de005f8ef8d1cf2d3b20d86626af206cbf780f6a6a12439a9c49e
+  informers (1.2.1) sha256=f686f745f640333b9cbfbb380fcdd62d48cff78b8fd9f33ec2dfed1b5d1ecf6e
+  json (2.19.3) sha256=289b0bb53052a1fa8c34ab33cc750b659ba14a5c45f3fcf4b18762dc67c78646
+  json-schema (6.2.0) sha256=e8bff46ed845a22c1ab2bd0d7eccf831c01fe23bb3920caa4c74db4306813666
+  mcp (0.10.0) sha256=09b9231eb16dff75cc7b8a95817c8acfcf4d1cab8d34f350671e43e765242b57
+  mruby_trunk (0.1.0)
+  nkf (0.2.0) sha256=fbc151bda025451f627fafdfcb3f4f13d0b22ae11f58c6d3a2939c76c5f5f126
+  onnxruntime (0.11.1-arm64-darwin) sha256=6d205e1adfcb77f0330b46ea9dcd3da9199034408dd5f58d56afca8e70fb686c
+  onnxruntime (0.11.1-x86_64-darwin) sha256=acdcbfbc937273fb27fd98587fde18199bb03dcd525f2da5324da42c97631eb9
+  onnxruntime (0.11.1-x86_64-linux) sha256=90a47c9ab70103cdd4dd2b99b5179dfed909b44ceb77a1cf076e9dcff925079c
+  picoruby_docs (0.1.0)
+  picoruby_trunk (0.1.0)
+  power_assert (3.0.1) sha256=8ce9876716cc74e863fcd4cdcdc52d792bd983598d1af3447083a3a9a4d34103
+  progressbar (1.13.0) sha256=18c921d1c527dbe7eba3c5a07a1e3bcdd5e42fc18276f5711187a7489448be78
+  public_suffix (7.0.5) sha256=1a8bb08f1bbea19228d3bed6e5ed908d1cb4f7c2726d18bd9cadf60bc676f623
+  rack (3.2.6) sha256=5ed78e1f73b2e25679bec7d45ee2d4483cc4146eb1be0264fc4d94cb5ef212c2
+  ruby_knowledge_store (0.1.0)
+  rurema (0.1.0)
+  sqlite-vec (0.1.9-arm64-darwin) sha256=f319ab08757741811c6f2f7d2b58c1b9009460e899e1b69d99fdab288286d9bf
+  sqlite-vec (0.1.9-x86_64-darwin) sha256=8a8d16c86c8d011359b0ab6f933dc9859f1cc265be6a8a9ac20ecd06cb3b8d32
+  sqlite-vec (0.1.9-x86_64-linux) sha256=772389c3bf68e7976cfdd8e7c74e820245007e03294808b9b05cdbbf5b02f398
+  sqlite3 (2.9.2-arm64-darwin) sha256=d15bd9609a05f9d54930babe039585efc8cadd57517c15b64ec7dfa75158a5e9
+  sqlite3 (2.9.2-x86_64-darwin) sha256=ed691b5021674d72582d03c5a38e89634b961902735fb6225273892805421d13
+  sqlite3 (2.9.2-x86_64-linux-gnu) sha256=dce83ffcb7e72f9f7aeb6e5404f15d277a45332fe18ccce8a8b3ed51e8d23aee
+  sqlite3 (2.9.2-x86_64-linux-musl) sha256=e8dd906a613f13b60f6d47ae9dda376384d9de1ab3f7e3f2fdf2fd18a871a2d7
+  test-unit (3.7.7) sha256=3c89d5ff0690a16bef9946156c4624390402b9d54dfcf4ce9cbd5b06bead1e45
+  tokenizers (0.6.3-arm64-darwin) sha256=29a6a5582dce106d846a906ee9e4254c12db45a3855c3ff6881d4be8be03e6b6
+  tokenizers (0.6.3-x86_64-darwin) sha256=4b71386cc08ceff5f86b448c74b2b297c00a280a1d502399b6cda23ef94e01fd
+  tokenizers (0.6.3-x86_64-linux) sha256=77a45cbde59daac33bdda1a74d45c18080478992a00ee7d898e7b8d15d0b3149
+  tokenizers (0.6.3-x86_64-linux-musl) sha256=a4b08c53bf0c8f7674c3abd03e013f0bb7c0c2457174b116c2872a37c64f0297
+  trunk_changes_diary (0.1.0)
+  webrick (1.9.2) sha256=beb4a15fc474defed24a3bda4ffd88a490d517c9e4e6118c3edce59e45864131
+
+RUBY VERSION
+  ruby 4.0.1
+
+BUNDLED WITH
+  4.0.3

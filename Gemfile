@@ -7,7 +7,7 @@ gem 'sqlite3'
 gem 'sqlite-vec'
 gem 'informers'
 gem 'mcp'
-gem 'bitclust', github: 'rurema/bitclust'
+gem 'bitclust-core', github: 'rurema/bitclust'
 gem 'trunk_changes_diary', path: '../trunk-changes-diary'
 
 gem 'chiebukuro_mcp',       path: 'gems/chiebukuro_mcp'
