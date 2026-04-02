@@ -24,6 +24,24 @@
   - 調査: picoruby の Rakefile でドキュメント生成コマンドを特定
   - SOURCE = `picoruby/picoruby:docs`
 
+### MCP サーバー提供（ローカル／リモート区別）
+
+#### ローカル MCP サーバー（stdio transport）
+
+- [ ] **導入スキル作成**（`~/.claude/skills/chiebukuro-mcp-local.md`）
+  - Claude Code の `mcpServers` 設定への追加手順を自動化するスキル
+  - `~/.claude/settings.json` または `.claude/settings.local.json` への書き込み
+  - `command: bundle exec ruby bin/serve` + `cwd` を自動設定
+  - `superpowers:writing-skills` スキルを使って作成する
+
+#### リモート MCP サーバー（Streamable HTTP）
+
+- [ ] `chiebukuro_mcp` に HTTP transport を追加
+  - `stateless: true` でリクエストごとに DB を開閉
+  - Rack + Puma でサーブ
+  - `bin/serve_http` エントリポイント追加
+  - 参考: mcp gem の `MCP::Server::Transports::RackTransport` 等を確認
+
 ### インフラ
 
 - [ ] cron 設定（`scripts/update_all.rb` を定期実行）
