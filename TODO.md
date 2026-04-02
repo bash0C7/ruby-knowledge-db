@@ -1,92 +1,65 @@
 # TODO — ruby-knowledge-db
 
-## 次セッションでやること
+## 現在の DB 状態（2026-04-02 時点）
 
-### 総合運転（最優先）
-
-- [ ] `bundle exec ruby scripts/update_all.rb` を実際に実行して動作確認
-  - picoruby/picoruby, ruby/ruby, mruby/mruby のローカルクローンが必要
-  - `config/sources.yml` の `repo_path` を実際のパスに合わせる
-- [ ] `bin/serve` を起動して MCP クライアントから接続確認
-  - `query` ツールで SELECT が通るか
-  - `schema` リソースで `_sqlite_mcp_meta` の内容が返るか
-
-### Phase 3c: rurema Collector
-
-- [ ] `gems/rurema/` 実装
-  - `bitclust-core` を使って rurema/doctree の RD ファイルをパース
-  - SOURCE = `rurema/doctree:ruby{version}`
-  - rurema/doctree リポジトリのローカルパスを `config/sources.yml` に追加
-  - 調査: `require 'bitclust/rdcompiler'` 等でどのクラスを使うか確認
-
-- [ ] `gems/picoruby_docs/` 実装
-  - picoruby/picoruby リポジトリで rake を実行してドキュメント生成
-  - 調査: picoruby の Rakefile でドキュメント生成コマンドを特定
-  - SOURCE = `picoruby/picoruby:docs`
-
-### MCP サーバー提供（ローカル／リモート区別）
-
-#### ローカル MCP サーバー（stdio transport）
-
-- [ ] **導入スキル作成**（`~/.claude/skills/chiebukuro-mcp-local.md`）
-  - Claude Code の `mcpServers` 設定への追加手順を自動化するスキル
-  - `~/.claude/settings.json` または `.claude/settings.local.json` への書き込み
-  - `command: bundle exec ruby bin/serve` + `cwd` を自動設定
-  - `superpowers:writing-skills` スキルを使って作成する
-
-#### リモート MCP サーバー（Streamable HTTP）
-
-- [ ] `chiebukuro_mcp` に HTTP transport を追加
-  - `stateless: true` でリクエストごとに DB を開閉
-  - Rack + Puma でサーブ
-  - `bin/serve_http` エントリポイント追加
-  - 参考: mcp gem の `MCP::Server::Transports::RackTransport` 等を確認
-
-### インフラ
-
-- [ ] cron 設定（`scripts/update_all.rb` を定期実行）
-  - 例: `0 6 * * * cd /path/to/ruby-knowledge-db && bundle exec ruby scripts/update_all.rb`
-  - `since` 引数の管理（前回実行時刻をファイルに保存するか検討）
-
-### 改善検討
-
-- [ ] `since` の永続化
-  - 現在は ARGV[0] で手渡し
-  - `db/last_run.txt` に前回実行時刻を保存する仕組みを `update_all.rb` に追加
-
-- [ ] mruby-c 対応
-  - `gems/mruby_c_trunk/` — mruby-c/mruby-c のリポジトリ名確認後に追加
-  - SOURCE = `mruby-c/mruby-c:trunk`
-
-- [ ] エラー通知
-  - Orchestrator の `results[:errors]` を Slack 等に飛ばす
+| ソース | 件数 | 備考 |
+|--------|------|------|
+| rurema/doctree:ruby3.3 | 1,559 | ✅ 完了 |
+| picoruby/picoruby:docs | 177 | ✅ 完了 |
+| picoruby/picoruby:trunk/article | 77 | ✅ MD ファイル手動 import |
+| picoruby/picoruby:trunk/diff | 6 | trunk-changes-diary 由来 |
+| ruby/ruby trunk | 0 | ❌ 要検討 |
+| mruby/mruby trunk | 0 | ❌ 要検討 |
 
 ---
 
-## アーキテクチャメモ（別セッション向け）
+## 要検討
 
+### trunk 系データソースの方針再考
+
+`picoruby_trunk` / `cruby_trunk` / `mruby_trunk` は `trunk-changes-diary` を使ってコミット解説を生成するが、
+**AI 生成にトークンコストが高い**。以下を検討：
+
+- [ ] trunk 系: AI 解説生成なし → raw commit log/diff のみ収集に変える？
+- [ ] ruby/ruby・mruby/mruby: shallow clone して収集する価値があるか？
+- [ ] picoruby_trunk: 今後は `import_md_files.rb` で手動 import に移行する？
+  - `/private/tmp/.../picoruby-trunk-changes` 配下の md ファイルが蓄積される運用
+  - `scripts/import_md_files.rb <dir>` で随時 import
+
+### データ拡充候補
+
+- [ ] mruby-c/mruby-c のドキュメント・変更履歴
+- [ ] rurema の他バージョン（ruby3.4 等）
+- [ ] RubyGems の人気 gem の README/ドキュメント
+
+---
+
+## 運用
+
+### 手動実行
+
+```bash
+# 通常更新（picoruby_docs / rurema の差分）
+bundle exec ruby scripts/update_all.rb
+
+# MD ファイル一括 import
+bundle exec ruby scripts/import_md_files.rb <dir> [source]
 ```
-# DB 更新（書き込み側）
-bundle exec ruby scripts/update_all.rb [ISO8601]
 
-# MCP サーバー起動（読み取り側）
-bin/serve
+### MCP サーバー
 
-# テスト全実行
-bundle exec ruby -Itest test/test_orchestrator.rb
-bundle exec ruby -Itest gems/ruby_knowledge_store/test/test_ruby_knowledge_store.rb
-bundle exec ruby -Itest gems/chiebukuro_mcp/test/test_chiebukuro_mcp.rb
-bundle exec ruby -Itest gems/picoruby_trunk/test/test_picoruby_trunk.rb
-bundle exec ruby -Itest gems/cruby_trunk/test/test_cruby_trunk.rb
-bundle exec ruby -Itest gems/mruby_trunk/test/test_mruby_trunk.rb
+```bash
+# Claude Code (user-wide): 登録済み
+claude mcp list  # chiebukuro-mcp ✓ Connected
+
+# Claude Desktop: claude_desktop_config.json に登録済み
+# scripts/start_mcp.sh 経由
 ```
 
-## 関連リポジトリ
+---
 
-| リポジトリ | パス | 用途 |
-|---|---|---|
-| trunk-changes-diary | `../trunk-changes-diary` | GitOps, ContentGenerator |
-| picoruby/picoruby | `~/dev/src/github.com/picoruby/picoruby` | Collector 対象 |
-| ruby/ruby | `~/dev/src/github.com/ruby/ruby` | Collector 対象 |
-| mruby/mruby | `~/dev/src/github.com/mruby/mruby` | Collector 対象 |
-| rurema/doctree | 要クローン | Collector 対象（Phase 3c） |
+## 技術的負債・改善候補
+
+- [ ] リモート MCP サーバー（Streamable HTTP / Rack + Puma）
+- [ ] エラー通知（Orchestrator の errors を Slack 等へ）
+- [ ] `import_md_files.rb` の since 対応（新規ファイルのみ import）
