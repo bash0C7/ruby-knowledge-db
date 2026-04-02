@@ -16,14 +16,13 @@ Ruby エコシステム（PicoRuby / CRuby / mruby / rurema）のナレッジを
 
 ```
 【このリポジトリ】ruby-knowledge-db
-  ├── gems/（in-project gems）各ソース固有の収集ロジック
-  │   ├── chiebukuro_mcp/    MCP サーバー（query + semantic_search）
-  │   ├── ruby_knowledge_store/  Store / Embedder / Migrator
-  │   ├── picoruby_trunk/    trunk-changes-diary をライブラリとして使用
-  │   ├── cruby_trunk/
-  │   ├── mruby_trunk/
-  │   ├── rurema/            bitclust-core で RD パース（実装済み）
-  │   └── picoruby_docs/     RBS + README 収集（実装済み）
+  ├── ../chiebukuro-mcp/                      MCP サーバー（query + semantic_search）
+  ├── ../ruby-knowledge-store/                Store / Embedder / Migrator
+  ├── ../picoruby-trunk-changes-generator/    trunk-changes-diary をライブラリとして使用
+  ├── ../cruby-trunk-changes-generator/
+  ├── ../mruby-trunk-changes-generator/
+  ├── ../rurema/                              bitclust-core で RD パース（実装済み）
+  └── ../picoruby-docs/                       RBS + README 収集（実装済み）
   ├── lib/ruby_knowledge_db/
   │   └── orchestrator.rb    全ソース一括更新
   ├── scripts/
@@ -170,15 +169,15 @@ embedding.pack("f*")   # float 配列 → blob
 
 | ファイル/ディレクトリ | 責務 |
 |-------------------|------|
-| `gems/chiebukuro_mcp/` | MCP サーバー（query / semantic_search ツール、schema リソース）|
-| `gems/ruby_knowledge_store/` | Store（write）/ Embedder（ruri-v3）/ Migrator |
-| `gems/picoruby_trunk/` | PicoRuby trunk 変更収集（trunk-changes-diary 使用）|
-| `gems/cruby_trunk/` | CRuby trunk 変更収集 |
-| `gems/mruby_trunk/` | mruby trunk 変更収集 |
-| `gems/rurema/` | rurema doctree RD パース（BitClust::RRDParser）|
-| `gems/picoruby_docs/` | PicoRuby RBS + README 収集 |
+| `../chiebukuro-mcp/` | MCP サーバー（query / semantic_search ツール、schema リソース）|
+| `../ruby-knowledge-store/` | Store（write）/ Embedder（ruri-v3）/ Migrator |
+| `../picoruby-trunk-changes-generator/` | PicoRuby trunk 変更収集（trunk-changes-diary 使用）|
+| `../cruby-trunk-changes-generator/` | CRuby trunk 変更収集 |
+| `../mruby-trunk-changes-generator/` | mruby trunk 変更収集 |
+| `../rurema/` | rurema doctree RD パース（BitClust::RRDParser）|
+| `../picoruby-docs/` | PicoRuby RBS + README 収集 |
 | `lib/ruby_knowledge_db/orchestrator.rb` | 全ソース一括更新オーケストレーション |
-| `migrations/001_schema.sql` | memories + FTS5 + vec0 + _sqlite_mcp_meta |
+| `../ruby-knowledge-store/migrations/001_schema.sql` | memories + FTS5 + vec0 + _sqlite_mcp_meta |
 | `config/sources.yml` | 収集対象リポジトリ設定 |
 | `scripts/update_all.rb` | 手動実行エントリポイント（since 永続化）|
 | `scripts/import_md_files.rb` | MD ファイル一括 import |

@@ -15,10 +15,9 @@ require 'yaml'
 dir    = ARGV[0] or abort "Usage: #{$0} <dir> [source]"
 source = ARGV[1] || 'picoruby/picoruby:trunk/article'
 
-db_path        = File.expand_path('../db/ruby_knowledge.db', __dir__)
-migrations_dir = File.expand_path('../migrations', __dir__)
+db_path = File.expand_path('../db/ruby_knowledge.db', __dir__)
 
-RubyKnowledgeStore::Migrator.new(db_path, migrations_dir: migrations_dir).run
+RubyKnowledgeStore::Migrator.new(db_path, migrations_dir: RubyKnowledgeStore::MIGRATIONS_DIR).run
 embedder = RubyKnowledgeStore::Embedder.new
 store    = RubyKnowledgeStore::Store.new(db_path, embedder: embedder)
 

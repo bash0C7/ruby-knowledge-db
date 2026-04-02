@@ -7,9 +7,9 @@ require 'time'
 require 'fileutils'
 
 require 'ruby_knowledge_store'
-require 'picoruby_trunk'
-require 'cruby_trunk'
-require 'mruby_trunk'
+require 'picoruby_trunk_changes_generator'
+require 'cruby_trunk_changes_generator'
+require 'mruby_trunk_changes_generator'
 require 'rurema'
 require 'picoruby_docs'
 require_relative '../lib/ruby_knowledge_db/orchestrator'
@@ -18,17 +18,16 @@ config   = YAML.load_file(File.join(__dir__, '../config/sources.yml'))
 db_path  = File.expand_path(config['db_path'], File.join(__dir__, '..'))
 
 # DB マイグレーション
-migrations_dir = File.expand_path('../migrations', __dir__)
-RubyKnowledgeStore::Migrator.new(db_path, migrations_dir: migrations_dir).run
+RubyKnowledgeStore::Migrator.new(db_path, migrations_dir: RubyKnowledgeStore::MIGRATIONS_DIR).run
 
 embedder = RubyKnowledgeStore::Embedder.new
 store    = RubyKnowledgeStore::Store.new(db_path, embedder: embedder)
 
 srcs = config['sources']
 collectors = [
-  srcs['picoruby_trunk'] && PicorubyTrunk::Collector.new(srcs['picoruby_trunk']),
-  srcs['cruby_trunk']    && CrubyTrunk::Collector.new(srcs['cruby_trunk']),
-  srcs['mruby_trunk']    && MrubyTrunk::Collector.new(srcs['mruby_trunk']),
+  srcs['picoruby_trunk'] && PicorubyTrunkChangesGenerator::Collector.new(srcs['picoruby_trunk']),
+  srcs['cruby_trunk']    && CrubyTrunkChangesGenerator::Collector.new(srcs['cruby_trunk']),
+  srcs['mruby_trunk']    && MrubyTrunkChangesGenerator::Collector.new(srcs['mruby_trunk']),
   srcs['rurema']         && Rurema::Collector.new(srcs['rurema']),
   srcs['picoruby_docs']  && PicorubyDocs::Collector.new(srcs['picoruby_docs']),
 ].compact

@@ -10,14 +10,14 @@ gem 'mcp'
 gem 'bitclust-core', github: 'rurema/bitclust'
 gem 'trunk_changes_diary', path: '../trunk-changes-diary'
 
-gem 'chiebukuro_mcp',       path: 'gems/chiebukuro_mcp'
-gem 'ruby_knowledge_store', path: 'gems/ruby_knowledge_store'
+gem 'chiebukuro_mcp',                    path: '../chiebukuro-mcp'
+gem 'ruby_knowledge_store',              path: '../ruby-knowledge-store'
 
-gem 'picoruby_trunk', path: 'gems/picoruby_trunk'
-gem 'cruby_trunk',    path: 'gems/cruby_trunk'
-gem 'mruby_trunk',    path: 'gems/mruby_trunk'
-gem 'rurema',         path: 'gems/rurema'
-gem 'picoruby_docs',  path: 'gems/picoruby_docs'
+gem 'picoruby_trunk_changes_generator',  path: '../picoruby-trunk-changes-generator'
+gem 'cruby_trunk_changes_generator',     path: '../cruby-trunk-changes-generator'
+gem 'mruby_trunk_changes_generator',     path: '../mruby-trunk-changes-generator'
+gem 'rurema',                            path: '../rurema'
+gem 'picoruby_docs',                     path: '../picoruby-docs'
 
 group :test do
   gem 'rake'
