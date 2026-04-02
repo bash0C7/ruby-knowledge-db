@@ -1,0 +1,8 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'bundler/setup'
+require 'chiebukuro_mcp'
+
+db_path = File.expand_path('../db/ruby_knowledge.db', __dir__)
+ChiebukuroMcp::Server.new(db_path: db_path).run
