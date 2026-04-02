@@ -28,9 +28,9 @@ PATH
       trunk_changes_diary
 
 PATH
-  remote: ../picoruby-docs
+  remote: ../picoruby-docs-collector
   specs:
-    picoruby_docs (0.1.0)
+    picoruby_docs_collector (0.1.0)
 
 PATH
   remote: ../picoruby-trunk-changes-generator
@@ -44,9 +44,9 @@ PATH
     ruby_knowledge_store (0.1.0)
 
 PATH
-  remote: ../rurema
+  remote: ../rurema-collector
   specs:
-    rurema (0.1.0)
+    rurema_collector (0.1.0)
       bitclust-core
 
 PATH
@@ -115,11 +115,11 @@ DEPENDENCIES
   informers
   mcp
   mruby_trunk_changes_generator!
-  picoruby_docs!
+  picoruby_docs_collector!
   picoruby_trunk_changes_generator!
   rake
   ruby_knowledge_store!
-  rurema!
+  rurema_collector!
   sqlite-vec
   sqlite3
   test-unit
@@ -145,7 +145,7 @@ CHECKSUMS
   onnxruntime (0.11.1-arm64-darwin) sha256=6d205e1adfcb77f0330b46ea9dcd3da9199034408dd5f58d56afca8e70fb686c
   onnxruntime (0.11.1-x86_64-darwin) sha256=acdcbfbc937273fb27fd98587fde18199bb03dcd525f2da5324da42c97631eb9
   onnxruntime (0.11.1-x86_64-linux) sha256=90a47c9ab70103cdd4dd2b99b5179dfed909b44ceb77a1cf076e9dcff925079c
-  picoruby_docs (0.1.0)
+  picoruby_docs_collector (0.1.0)
   picoruby_trunk_changes_generator (0.1.0)
   power_assert (3.0.1) sha256=8ce9876716cc74e863fcd4cdcdc52d792bd983598d1af3447083a3a9a4d34103
   progressbar (1.13.0) sha256=18c921d1c527dbe7eba3c5a07a1e3bcdd5e42fc18276f5711187a7489448be78
@@ -153,7 +153,7 @@ CHECKSUMS
   rack (3.2.6) sha256=5ed78e1f73b2e25679bec7d45ee2d4483cc4146eb1be0264fc4d94cb5ef212c2
   rake (13.3.1) sha256=8c9e89d09f66a26a01264e7e3480ec0607f0c497a861ef16063604b1b08eb19c
   ruby_knowledge_store (0.1.0)
-  rurema (0.1.0)
+  rurema_collector (0.1.0)
   sqlite-vec (0.1.9-arm64-darwin) sha256=f319ab08757741811c6f2f7d2b58c1b9009460e899e1b69d99fdab288286d9bf
   sqlite-vec (0.1.9-x86_64-darwin) sha256=8a8d16c86c8d011359b0ab6f933dc9859f1cc265be6a8a9ac20ecd06cb3b8d32
   sqlite-vec (0.1.9-x86_64-linux) sha256=772389c3bf68e7976cfdd8e7c74e820245007e03294808b9b05cdbbf5b02f398

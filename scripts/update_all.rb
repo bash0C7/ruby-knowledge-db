@@ -10,8 +10,8 @@ require 'ruby_knowledge_store'
 require 'picoruby_trunk_changes_generator'
 require 'cruby_trunk_changes_generator'
 require 'mruby_trunk_changes_generator'
-require 'rurema'
-require 'picoruby_docs'
+require 'rurema_collector'
+require 'picoruby_docs_collector'
 require_relative '../lib/ruby_knowledge_db/orchestrator'
 
 config   = YAML.load_file(File.join(__dir__, '../config/sources.yml'))
@@ -28,8 +28,8 @@ collectors = [
   srcs['picoruby_trunk'] && PicorubyTrunkChangesGenerator::Collector.new(srcs['picoruby_trunk']),
   srcs['cruby_trunk']    && CrubyTrunkChangesGenerator::Collector.new(srcs['cruby_trunk']),
   srcs['mruby_trunk']    && MrubyTrunkChangesGenerator::Collector.new(srcs['mruby_trunk']),
-  srcs['rurema']         && Rurema::Collector.new(srcs['rurema']),
-  srcs['picoruby_docs']  && PicorubyDocs::Collector.new(srcs['picoruby_docs']),
+  srcs['rurema']         && RuremaCollector::Collector.new(srcs['rurema']),
+  srcs['picoruby_docs']  && PicorubyDocsCollector::Collector.new(srcs['picoruby_docs']),
 ].compact
 
 last_run_path = File.expand_path('../db/last_run.yml', __dir__)
