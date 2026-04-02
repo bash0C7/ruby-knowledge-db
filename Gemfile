@@ -20,5 +20,6 @@ gem 'rurema',         path: 'gems/rurema'
 gem 'picoruby_docs',  path: 'gems/picoruby_docs'
 
 group :test do
+  gem 'rake'
   gem 'test-unit'
 end

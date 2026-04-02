@@ -12,3 +12,10 @@ sources:
   cruby_trunk:
     repo_path: ~/dev/src/github.com/ruby/ruby
     branch: master
+
+  rurema:
+    doctree_path: ~/dev/src/github.com/rurema/doctree
+    version: "3.3.0"
+
+  picoruby_docs:
+    repo_path: ~/dev/src/github.com/picoruby/picoruby
