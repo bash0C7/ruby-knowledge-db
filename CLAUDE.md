@@ -14,32 +14,25 @@ Ruby エコシステム（PicoRuby / CRuby / mruby / rurema）のナレッジを
 
 ## アーキテクチャ全体像
 
-このリポジトリは「DBを作る・育てる」側。「DBを読ませる」側は別プロジェクト（sqlite-mcp、未実装）。
-
 ```
 【このリポジトリ】ruby-knowledge-db
   ├── gems/（in-project gems）各ソース固有の収集ロジック
+  │   ├── chiebukuro_mcp/    MCP サーバー（query + semantic_search）
+  │   ├── ruby_knowledge_store/  Store / Embedder / Migrator
   │   ├── picoruby_trunk/    trunk-changes-diary をライブラリとして使用
   │   ├── cruby_trunk/
   │   ├── mruby_trunk/
-  │   ├── rurema/            bitclust をライブラリとして使用（要調査）
-  │   └── picoruby_docs/     picoruby repo 内で rake 実行（要調査）
+  │   ├── rurema/            bitclust-core で RD パース（実装済み）
+  │   └── picoruby_docs/     RBS + README 収集（実装済み）
   ├── lib/ruby_knowledge_db/
-  │   ├── store.rb           long-term-memory の MemoryStore 薄ラッパー
   │   └── orchestrator.rb    全ソース一括更新
-  └── scripts/update_all.rb  cron エントリポイント
-
-【別リポジトリ予定】sqlite-mcp
-  DBを読ませる（SQLQL サーバー）
-  → ruby_knowledge.db を databases.yml に登録するだけ
-  → ローカル: stdio transport（mcp gem）
-  → リモート: Streamable HTTP + Rack + Puma（stateless: true）
-
-【既存リポジトリ】long-term-memory（ライブラリとして使用）
-  path: ../long-term-memory — MemoryStore クラスを利用
-
-【既存リポジトリ】trunk-changes-diary（ライブラリとして使用）
-  path: ../trunk-changes-diary — TrunkChanges クラスを利用
+  ├── scripts/
+  │   ├── update_all.rb      手動実行エントリポイント（since 永続化: db/last_run.yml）
+  │   ├── import_md_files.rb MD ファイル一括 import（picoruby trunk 変更記事等）
+  │   └── start_mcp.sh       Claude Desktop 用起動スクリプト
+  └── db/
+      ├── ruby_knowledge.db  本番 DB（git 管理外）
+      └── last_run.yml       since 永続化（コレクタークラス名 → 最終実行時刻）
 ```
 
 ---
@@ -70,7 +63,7 @@ end
 
 ## DB スキーマ設計
 
-### memories テーブル（long-term-memory の MemoryStore と同構造）
+### memories テーブル
 
 ```sql
 CREATE TABLE memories (
@@ -81,31 +74,21 @@ CREATE TABLE memories (
   embedding    BLOB,
   created_at   TEXT    NOT NULL
 );
-CREATE VIRTUAL TABLE memories_fts  USING fts5(content, tokenize='trigram');
-CREATE VIRTUAL TABLE memories_vec0 USING vec0(embedding float[768]);
-```
-
-### _sqlite_mcp_meta テーブル（SQLQL サーバー用自己記述）
-
-```sql
-CREATE TABLE _sqlite_mcp_meta (
-  object_type TEXT NOT NULL,  -- 'db' | 'table' | 'column'
-  object_name TEXT NOT NULL,
-  description TEXT,
-  PRIMARY KEY (object_type, object_name)
-);
+CREATE VIRTUAL TABLE memories_fts  USING fts5(content, content='memories', content_rowid='id', tokenize='trigram');
+CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, embedding FLOAT[768]);
 ```
 
 ### source 値の規約
 
 | source 値 | 内容 |
 |-----------|------|
-| `picoruby/picoruby:trunk` | PicoRuby trunk 変更履歴 |
-| `ruby/ruby:trunk` | CRuby trunk 変更履歴 |
-| `mruby/mruby:trunk` | mruby trunk 変更履歴 |
-| `mruby-c/mruby-c:trunk` | mruby/c trunk 変更履歴 |
-| `rurema/doctree:ruby33` | るりま Ruby 3.3 ドキュメント |
-| `picoruby/picoruby:docs` | PicoRuby rake 生成ドキュメント |
+| `picoruby/picoruby:trunk/article` | PicoRuby trunk 変更記事（AI 生成 or MD import）|
+| `picoruby/picoruby:trunk/diff` | PicoRuby trunk 生 diff |
+| `ruby/ruby:trunk/article` | CRuby trunk 変更記事 |
+| `mruby/mruby:trunk/article` | mruby trunk 変更記事 |
+| `rurema/doctree:ruby3.3/{lib}` | るりま Ruby 3.3 ライブラリドキュメント |
+| `rurema/doctree:ruby3.3/{lib}#{class}` | るりま Ruby 3.3 クラスドキュメント |
+| `picoruby/picoruby:docs/{gem}` | PicoRuby gem RBS + README |
 
 ---
 
@@ -113,21 +96,9 @@ CREATE TABLE _sqlite_mcp_meta (
 
 | リポジトリ | ローカルパス | 使い方 |
 |-----------|------------|--------|
-| long-term-memory | `../long-term-memory` | MemoryStore クラス |
 | trunk-changes-diary | `../trunk-changes-diary` | TrunkChanges クラス |
-
-```ruby
-# Gemfile
-gem 'long_term_memory',      path: '../long-term-memory'
-gem 'trunk_changes_diary',   path: '../trunk-changes-diary'
-
-# in-project gems
-gem 'picoruby_trunk', path: 'gems/picoruby_trunk'
-gem 'rurema',         path: 'gems/rurema'
-# ...
-```
-
-**注意:** long-term-memory / trunk-changes-diary に gemspec がない場合、`$LOAD_PATH` 操作が必要。gemspec 追加を先に行うこと（PLAN.md Phase 0 参照）。
+| rurema/doctree | `~/dev/src/github.com/rurema/doctree` | RD ファイル収集対象 |
+| picoruby/picoruby | `~/dev/src/github.com/picoruby/picoruby` | docs 収集対象 |
 
 ---
 
@@ -142,6 +113,7 @@ gem 'rurema',         path: 'gems/rurema'
 - Red → Green → Refactor の順を守る
 - テストファイルは絶対に削除しない
 - 実モデル（ONNX）はテストで起動しない（StubEmbedder 使用）
+- 全テスト: `bundle exec rake test`（52件）
 
 ### git
 - conventional commits スタイル（`feat:` / `fix:` / `test:` / `chore:` / `docs:`）
@@ -164,9 +136,24 @@ require 'sqlite_vec'   # アンダースコア（ハイフンではない）
 ### content_hash による冪等性
 `Digest::SHA256.hexdigest(content)` を UNIQUE INDEX で管理。同一内容の二重保存は DB 層で自動スキップ。
 
-### created_at フォーマット
-```ruby
-Time.now.iso8601   # RFC 3339
+### vec0 KNN クエリ構文
+```sql
+SELECT m.content, m.source, v.distance
+FROM memories_vec v
+JOIN memories m ON m.id = v.memory_id
+WHERE v.embedding MATCH ? AND k = ?
+ORDER BY v.distance
+```
+
+### since 永続化
+`db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。
+`scripts/update_all.rb` が自動読み書き。ARGV[0] で手動上書き可能。
+
+### MD ファイル import（picoruby trunk）
+```bash
+bundle exec ruby scripts/import_md_files.rb <dir> [source]
+# YAML フロントマター除去 + content_hash 重複スキップ
+# ファイル名パターン: YYYY-MM-DD.md のみ（重複ファイル自動除外）
 ```
 
 ### FTS5 の日本語対応
@@ -183,24 +170,19 @@ embedding.pack("f*")   # float 配列 → blob
 
 | ファイル/ディレクトリ | 責務 |
 |-------------------|------|
-| `gems/picoruby_trunk/` | PicoRuby trunk 変更収集（trunk-changes-diary 使用） |
+| `gems/chiebukuro_mcp/` | MCP サーバー（query / semantic_search ツール、schema リソース）|
+| `gems/ruby_knowledge_store/` | Store（write）/ Embedder（ruri-v3）/ Migrator |
+| `gems/picoruby_trunk/` | PicoRuby trunk 変更収集（trunk-changes-diary 使用）|
 | `gems/cruby_trunk/` | CRuby trunk 変更収集 |
 | `gems/mruby_trunk/` | mruby trunk 変更収集 |
-| `gems/rurema/` | rurema doctree 取得・RD パース（bitclust 使用） |
-| `gems/picoruby_docs/` | PicoRuby rake 生成ドキュメント取得 |
-| `lib/ruby_knowledge_db/store.rb` | MemoryStore 薄ラッパー |
+| `gems/rurema/` | rurema doctree RD パース（BitClust::RRDParser）|
+| `gems/picoruby_docs/` | PicoRuby RBS + README 収集 |
 | `lib/ruby_knowledge_db/orchestrator.rb` | 全ソース一括更新オーケストレーション |
-| `migrations/001_schema.sql` | memories テーブル + FTS5 + vec0 |
-| `migrations/002_meta.sql` | _sqlite_mcp_meta テーブル + 初期データ |
+| `migrations/001_schema.sql` | memories + FTS5 + vec0 + _sqlite_mcp_meta |
 | `config/sources.yml` | 収集対象リポジトリ設定 |
-| `scripts/update_all.rb` | cron 実行エントリポイント |
+| `scripts/update_all.rb` | 手動実行エントリポイント（since 永続化）|
+| `scripts/import_md_files.rb` | MD ファイル一括 import |
+| `scripts/start_mcp.sh` | Claude Desktop 用 MCP 起動スクリプト |
+| `bin/serve` | Claude Code 用 MCP サーバー起動 |
+| `db/last_run.yml` | since 永続化ファイル（git 管理外）|
 | `test/test_helper.rb` | StubEmbedder + 共通セットアップ |
-
----
-
-## 未解決の論点（実装前に要調査）
-
-1. **long-term-memory / trunk-changes-diary の gemspec 化** — 現状 gemspec がない場合は先に追加が必要
-2. **rurema の RD パース** — `bitclust` gem をライブラリとして使えるか確認
-3. **PicoRuby docs の rake コマンド** — picoruby repo で何を実行すれば docs が生成されるか確認
-4. **mruby-c リポジトリ名** — `mruby-c/mruby-c` か `mruby/mruby-c` か確認
