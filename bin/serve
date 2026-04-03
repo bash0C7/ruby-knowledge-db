@@ -4,7 +4,9 @@
 require 'bundler/setup'
 require 'chiebukuro_mcp'
 require 'ruby_knowledge_store'
+require 'json'
 
-db_path  = File.expand_path('../db/ruby_knowledge.db', __dir__)
-embedder = RubyKnowledgeStore::Embedder.new
-ChiebukuroMcp::Server.new(db_path: db_path, embedder: embedder).run
+config_path = File.expand_path('../config/chiebukuro.json', __dir__)
+config      = JSON.parse(File.read(config_path))
+embedder    = RubyKnowledgeStore::Embedder.new
+ChiebukuroMcp::Server.new(config: config, embedder: embedder).run

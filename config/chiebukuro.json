@@ -1,0 +1,26 @@
+{
+  "databases": {
+    "ruby_knowledge": {
+      "path": "/Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db/db/ruby_knowledge.db",
+      "description": "CRuby/mruby/PicoRubyの知識DB。ruremaドキュメントや実装知識を収録。",
+      "semantic_search": {
+        "vec_table": "memories_vec",
+        "content_table": "memories",
+        "content_column": "content",
+        "source_column": "source",
+        "join_key": "memory_id"
+      }
+    },
+    "long_term_memory": {
+      "path": "/Users/bash/dev/src/github.com/bash0C7/long-term-memory/db/memory.db",
+      "description": "Claude Codeとのやりとりを長期保存するDB。会話・スキル・プロジェクト別の知識を収録。",
+      "semantic_search": {
+        "vec_table": "memories_vec",
+        "content_table": "memories",
+        "content_column": "content",
+        "source_column": "source",
+        "join_key": "memory_id"
+      }
+    }
+  }
+}
