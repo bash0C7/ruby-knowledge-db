@@ -21,6 +21,10 @@
         "source_column": "source",
         "join_key": "memory_id"
       }
+    },
+    "health": {
+      "path": "/Users/bash/dev/src/github.com/bash0C7/apple_healthcare_analyzer/db/health.db",
+      "description": "Apple HealthKit データ分析DB（chiebukuro 知恵袋）。日次サマリー・心拍・歩数・睡眠・身体スコア（body_battery）を収録。daily_summary, records, raw_records テーブルを含む。"
     }
   }
 }
