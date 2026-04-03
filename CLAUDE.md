@@ -178,10 +178,11 @@ embedding.pack("f*")   # float 配列 → blob
 | `../picoruby-docs/` | PicoRuby RBS + README 収集 |
 | `lib/ruby_knowledge_db/orchestrator.rb` | 全ソース一括更新オーケストレーション |
 | `../ruby-knowledge-store/migrations/001_schema.sql` | memories + FTS5 + vec0 + _sqlite_mcp_meta |
+| `config/chiebukuro.json.example` | DB 接続設定テンプレート（実設定は `~/chiebukuro-mcp/chiebukuro.json` へ）|
 | `config/sources.yml` | 収集対象リポジトリ設定 |
 | `scripts/update_all.rb` | 手動実行エントリポイント（since 永続化）|
 | `scripts/import_md_files.rb` | MD ファイル一括 import |
-| `scripts/start_mcp.sh` | Claude Desktop 用 MCP 起動スクリプト |
-| `bin/serve` | Claude Code 用 MCP サーバー起動 |
+| `scripts/start_mcp.sh` | MCP 起動スクリプト（SCRIPT_DIR 相対パス、環境非依存）|
+| `bin/serve` | MCP サーバー起動（`~/chiebukuro-mcp/chiebukuro.json` 優先ロード）|
 | `db/last_run.yml` | since 永続化ファイル（git 管理外）|
 | `test/test_helper.rb` | StubEmbedder + 共通セットアップ |

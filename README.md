@@ -85,15 +85,44 @@ bundle exec ruby scripts/import_md_files.rb <dir> [source]
 bundle exec ruby bin/serve
 ```
 
+## 個人設定（~/chiebukuro-mcp/）
+
+DB パスや接続先などの個人環境依存設定はリポジトリとは分離し、`~/chiebukuro-mcp/chiebukuro.json` に置く。
+
+```bash
+mkdir -p ~/chiebukuro-mcp
+cp config/chiebukuro.json.example ~/chiebukuro-mcp/chiebukuro.json
+# パスを自分の環境に合わせて編集
+```
+
+`bin/serve` は `~/chiebukuro-mcp/chiebukuro.json` を優先ロードし、なければ `config/chiebukuro.json` にフォールバックする。
+
+### DB ファイルの配置（iCloud Drive 推奨）
+
+`~/chiebukuro-mcp/chiebukuro.json` は dotfiles（iCloud + GitHub）で管理済み。
+DB ファイルは大きいため dotfiles とは**別の** iCloud Drive フォルダに置く:
+
+```
+~/Library/Mobile Documents/com~apple~CloudDocs/chiebukuro-mcp/db/
+  ruby_knowledge.db      # ← 主に読み取り、infrequent 書き込み
+  memory.db              # ← 長期記憶（書き込み頻度高め、単一マシン運用なら OK）
+  health.db              # ← Apple HealthKit（import スクリプトのみ書き込み）
+```
+
+`~/chiebukuro-mcp/chiebukuro.json` の各 `path` をこのパスに更新する。
+書き込みが頻繁な DB は同時に複数マシンから書かないこと（SQLite WAL の同期競合リスク）。
+
 ## MCP 登録
 
 ```bash
 # Claude Code（ユーザーワイド）
+REPO=/path/to/ruby-knowledge-db
+claude mcp remove chiebukuro-mcp -s user 2>/dev/null || true
 claude mcp add-json chiebukuro-mcp \
-  '{"command":"bundle","args":["exec","ruby","bin/serve"],"cwd":"/Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db"}' \
+  "{\"command\":\"$REPO/scripts/start_mcp.sh\"}" \
   --scope user
 
-# Claude Desktop: claude_desktop_config.json に以下を追加
+# Claude Desktop: ~/Library/Application Support/Claude/claude_desktop_config.json に追加
 # "chiebukuro-mcp": { "command": "/path/to/ruby-knowledge-db/scripts/start_mcp.sh" }
 ```
 
@@ -101,9 +130,9 @@ claude mcp add-json chiebukuro-mcp \
 
 | ツール | 説明 |
 |--------|------|
-| `semantic_search` | 自然言語 → vec0 KNN（768次元 ruri-v3）|
-| `query` | SQL SELECT（読み取り専用）|
-| `schema://database` | スキーマ説明リソース |
+| `chiebukuro_query_<db>` | SQL SELECT（読み取り専用）各 DB ごとに生成 |
+| `chiebukuro_semantic_search_<db>` | 自然言語 → vec0 KNN（768次元 ruri-v3）`semantic_search` 設定のある DB のみ |
+| `schema://<db>` | スキーマ説明リソース |
 
 ## DB スキーマ
 
