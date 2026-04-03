@@ -1,0 +1,19 @@
+{
+  "databases": {
+    "example_db": {
+      "path": "/path/to/your/database.db",
+      "description": "説明文をここに書く。",
+      "semantic_search": {
+        "vec_table": "memories_vec",
+        "content_table": "memories",
+        "content_column": "content",
+        "source_column": "source",
+        "join_key": "memory_id"
+      }
+    },
+    "query_only_db": {
+      "path": "/path/to/another/database.db",
+      "description": "semantic_search セクションなし → chiebukuro_query_* のみ生成"
+    }
+  }
+}
