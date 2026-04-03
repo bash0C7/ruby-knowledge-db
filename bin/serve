@@ -7,6 +7,6 @@ require 'ruby_knowledge_store'
 require 'json'
 
 config_path = File.expand_path('../config/chiebukuro.json', __dir__)
-config      = JSON.parse(File.read(config_path))
+config      = JSON.parse(File.read(config_path, encoding: 'UTF-8'))
 embedder    = RubyKnowledgeStore::Embedder.new
 ChiebukuroMcp::Server.new(config: config, embedder: embedder).run
