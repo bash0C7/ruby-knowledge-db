@@ -56,7 +56,9 @@
       "Bash(mv lib/picoruby_docs lib/picoruby_docs_collector)",
       "Bash(mv test/test_picoruby_docs.rb test/test_picoruby_docs_collector.rb)",
       "Bash(grep -r \"trunk.changes.diary\" ~/dev/src/github.com/bash0C7/cruby-trunk-changes-generator/*.gemspec ~/dev/src/github.com/bash0C7/mruby-trunk-changes-generator/*.gemspec ~/dev/src/github.com/bash0C7/picoruby-trunk-changes-generator/*.gemspec)",
-      "Bash(rake test:*)"
+      "Bash(rake test:*)",
+      "Bash(APP_ENV=test SINCE=2026-04-02 BEFORE=2026-04-04 bundle exec:*)",
+      "Bash(pkill -f \"rake generate:picoruby_trunk\")"
     ]
   },
   "enableAllProjectMcpServers": true

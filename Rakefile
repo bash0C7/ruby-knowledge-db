@@ -8,22 +8,42 @@ end
 
 task default: :test
 
-# ---- 共通ヘルパー（遅延ロード） ----
-def require_runtime_deps
+# ---- 共通ヘルパー（遅延ロード、用途別） ----
+def require_base
   require 'bundler/setup'
   require 'yaml'
   require 'date'
   require 'fileutils'
   require 'tmpdir'
-  require 'ruby_knowledge_store'
+  require_relative 'lib/ruby_knowledge_db/config'
+end
+
+def require_generate_deps
+  require_base
   require 'picoruby_trunk_changes_generator'
   require 'cruby_trunk_changes_generator'
   require 'mruby_trunk_changes_generator'
+end
+
+def require_store_deps
+  require_base
+  require 'ruby_knowledge_store'
+  require_relative 'lib/ruby_knowledge_db/orchestrator'
+end
+
+def require_import_deps
+  require_store_deps
+end
+
+def require_esa_deps
+  require_base
+  require_relative 'lib/ruby_knowledge_db/esa_writer'
+end
+
+def require_update_deps
+  require_store_deps
   require 'rurema_collector'
   require 'picoruby_docs_collector'
-  require_relative 'lib/ruby_knowledge_db/config'
-  require_relative 'lib/ruby_knowledge_db/orchestrator'
-  require_relative 'lib/ruby_knowledge_db/esa_writer'
 end
 
 LAST_RUN_PATH = File.expand_path('db/last_run.yml', __dir__)
@@ -82,7 +102,7 @@ end
 # ---- Phase 1: generate ----
 namespace :generate do
   def generate_trunk(klass_name, config_key)
-    require_runtime_deps
+    require_generate_deps
     since  = ENV['SINCE']  or abort "SINCE required (e.g., SINCE=2026-04-08)"
     before = ENV['BEFORE'] or abort "BEFORE required (e.g., BEFORE=2026-04-09)"
 
@@ -116,7 +136,7 @@ end
 # ---- Phase 2a: import to SQLite ----
 namespace :import do
   def import_trunk(config_key)
-    require_runtime_deps
+    require_import_deps
     dir = ENV['DIR'] or abort "DIR required (output of rake generate:#{config_key})"
 
     cfg   = RubyKnowledgeDb::Config.load
@@ -154,7 +174,7 @@ end
 # ---- Phase 2b: post to esa ----
 namespace :esa do
   def post_trunk(config_key)
-    require_runtime_deps
+    require_esa_deps
     dir = ENV['DIR'] or abort "DIR required (output of rake generate:#{config_key})"
 
     cfg      = RubyKnowledgeDb::Config.load
@@ -205,7 +225,7 @@ end
 # ---- update: SQLite 直接書き込み（rurema/picoruby_docs 向け） ----
 namespace :update do
   def run_collector(collector_key, klass_name, config_key)
-    require_runtime_deps
+    require_update_deps
     since  = ENV['SINCE']  or abort "SINCE required (e.g., SINCE=2026-04-08)"
     before = ENV['BEFORE'] or abort "BEFORE required (e.g., BEFORE=2026-04-09)"
 
