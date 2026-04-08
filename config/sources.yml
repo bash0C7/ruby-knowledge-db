@@ -1,5 +1,3 @@
-db_path: db/ruby_knowledge.db
-
 sources:
   picoruby_trunk:
     repo_path: ~/dev/src/github.com/picoruby/picoruby

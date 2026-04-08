@@ -1,0 +1,12 @@
+db_path: db/ruby_knowledge_test.db
+
+esa:
+  team: bist
+  wip: true
+  sources:
+    picoruby_trunk:
+      category: test/picoruby/trunk-changes
+    mruby_trunk:
+      category: test/mruby/trunk-changes
+    cruby_trunk:
+      category: test/cruby/trunk-changes

@@ -1,0 +1,12 @@
+db_path: db/ruby_knowledge.db
+
+esa:
+  team: bash-trunk-changes
+  wip: false
+  sources:
+    picoruby_trunk:
+      category: production/picoruby/trunk-changes
+    mruby_trunk:
+      category: production/mruby/trunk-changes
+    cruby_trunk:
+      category: production/cruby/trunk-changes
