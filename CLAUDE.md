@@ -112,7 +112,8 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 - Red → Green → Refactor の順を守る
 - テストファイルは絶対に削除しない
 - 実モデル（ONNX）はテストで起動しない（StubEmbedder 使用）
-- 全テスト: `bundle exec rake test`（52件）
+- ruby-knowledge-db テスト: `bundle exec rake test`
+- trunk-changes-diary テスト: `cd ../trunk-changes-diary && rake test`（bundler 不要）
 
 ### git
 - conventional commits スタイル（`feat:` / `fix:` / `test:` / `chore:` / `docs:`）
@@ -143,6 +144,44 @@ JOIN memories m ON m.id = v.memory_id
 WHERE v.embedding MATCH ? AND k = ?
 ORDER BY v.distance
 ```
+
+### 3 フェーズパイプライン（trunk-changes）
+
+trunk 変更記事の生成・格納・投稿は 3 フェーズに分離:
+
+```bash
+# Phase 1: generate — shallow clone → merge/non-merge 判定 → Claude CLI で daily article 生成
+APP_ENV=test SINCE=2026-04-05 BEFORE=2026-04-06 bundle exec rake generate:picoruby_trunk
+# → DIR=... が出力される（tmpdir パス）
+
+# Phase 2a: import — MD → SQLite（content_hash で冪等）
+APP_ENV=test DIR=$DIR bundle exec rake import:picoruby_trunk
+
+# Phase 2b: esa — article MD → esa API（WIP 記事投稿）
+APP_ENV=test DIR=$DIR bundle exec rake esa:picoruby_trunk
+```
+
+- SINCE/BEFORE: 半開区間 `[since, before)`。1日分なら `SINCE=2026-04-05 BEFORE=2026-04-06`
+- Claude CLI は sonnet モデルを使用（trunk-changes-diary のデフォルト）
+- MD ファイル名: `YYYY-MM-DD-diff.md` / `YYYY-MM-DD-article.md`
+
+### APP_ENV
+
+| APP_ENV | DB | esa team | esa wip |
+|---|---|---|---|
+| development（デフォルト） | db/ruby_knowledge_development.db | bist | true |
+| test | db/ruby_knowledge_test.db | bist | true |
+| production | db/ruby_knowledge.db | bash-trunk-changes | false |
+
+環境設定: `config/environments/{APP_ENV}.yml`
+
+### merge commit の扱い（trunk-changes-diary）
+
+- **merge commit**: `git diff M^1..M --ignore-submodules` で PR 全体の差分を取得。`git log M^1..M --oneline` でコミット一覧を付与。「PR 全体をまとめて解説」する記事を生成
+- **non-merge commit**（直接 push / rebase）: `git diff parent..hash --ignore-submodules` で個別差分
+- **orphan / shallow boundary**: `git diff-tree --stat` でフォールバック（サイズ安全）
+- **shallow clone**: `--shallow-since=SINCE-2day` で merge commit の M^1 が確実に取得できる深さを確保
+- **submodule**: `--ignore-submodules` で除外（将来別コンテキストで記事生成予定）
 
 ### since 永続化
 `db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。
