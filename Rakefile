@@ -85,7 +85,7 @@ def parse_md(path)
   return nil unless raw.start_with?('---')
   parts = raw.split(/^---\s*$/, 3)
   return nil if parts.length < 3
-  fm      = YAML.safe_load(parts[1]) || {}
+  fm      = YAML.safe_load(parts[1], permitted_classes: [Date]) || {}
   content = parts[2].strip
   return nil if content.empty?
   { source: fm['source'], type: fm['type'], content: content }
