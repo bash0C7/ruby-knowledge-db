@@ -1,14 +1,11 @@
 sources:
   picoruby_trunk:
-    repo_path: ~/dev/src/github.com/picoruby/picoruby
     branch: master
 
   mruby_trunk:
-    repo_path: ~/dev/src/github.com/mruby/mruby
     branch: master
 
   cruby_trunk:
-    repo_path: ~/dev/src/github.com/ruby/ruby
     branch: master
 
   rurema:
