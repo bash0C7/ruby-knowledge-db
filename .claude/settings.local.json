@@ -58,7 +58,14 @@
       "Bash(grep -r \"trunk.changes.diary\" ~/dev/src/github.com/bash0C7/cruby-trunk-changes-generator/*.gemspec ~/dev/src/github.com/bash0C7/mruby-trunk-changes-generator/*.gemspec ~/dev/src/github.com/bash0C7/picoruby-trunk-changes-generator/*.gemspec)",
       "Bash(rake test:*)",
       "Bash(APP_ENV=test SINCE=2026-04-02 BEFORE=2026-04-04 bundle exec:*)",
-      "Bash(pkill -f \"rake generate:picoruby_trunk\")"
+      "Bash(pkill -f \"rake generate:picoruby_trunk\")",
+      "Bash(git -C /Users/bash/dev/src/github.com/bash0C7/picoruby-trunk-changes-generator/repos/picoruby log --oneline -3)",
+      "Bash(APP_ENV=test SINCE=2026-04-05 BEFORE=2026-04-06 bundle exec:*)",
+      "Bash(git -C ~/dev/src/github.com/bash0C7/picoruby-trunk-changes-generator/repos/picoruby log master --after=\"2026-04-04 23:59:59 +0900\" --before=\"2026-04-05 23:59:59 +0900\" --format=\"%H %ai %s\")",
+      "Bash(git:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(cp /tmp/shallow_cleaned .git/shallow)",
+      "Read(//tmp/picoruby_test_clone/.git/**)"
     ]
   },
   "enableAllProjectMcpServers": true
