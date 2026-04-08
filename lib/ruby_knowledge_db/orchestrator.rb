@@ -7,22 +7,26 @@ module RubyKnowledgeDb
       @collectors = collectors
     end
 
-    # @param since [String, nil] ISO8601 — 前回実行時刻。nil なら全件
+    # @param since  [String, nil] ISO8601 — 収集開始時刻。nil なら全件
+    # @param before [String, nil] ISO8601 — 収集終了時刻（排他）
     # @return [Hash] { stored: Integer, skipped: Integer, errors: Array<String> }
-    def run(since: nil)
+    def run(since:, before:)
       results = { stored: 0, skipped: 0, errors: [] }
 
       @collectors.each do |collector|
-        collector.collect(since: since).each do |chunk|
-          id = @store.store(chunk[:content], source: chunk[:source])
-          if id
-            results[:stored] += 1
-          else
-            results[:skipped] += 1
+        begin
+          records = collector.collect(since: since, before: before)
+          records.each do |record|
+            id = @store.store(record[:content], source: record[:source])
+            if id
+              results[:stored] += 1
+            else
+              results[:skipped] += 1
+            end
           end
+        rescue => e
+          results[:errors] << "#{collector.class.name}: #{e.message}"
         end
-      rescue => e
-        results[:errors] << "#{collector.class}: #{e.message}"
       end
 
       results
