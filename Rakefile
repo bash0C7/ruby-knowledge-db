@@ -63,17 +63,15 @@ def build_store(cfg)
   RubyKnowledgeStore::Store.new(db, embedder: RubyKnowledgeStore::Embedder.new)
 end
 
-# MD ファイルに YAML frontmatter 付きで保存
+# MD ファイルに YAML frontmatter 付きで保存（日単位: YYYY-MM-DD-{type}.md）
 def write_md(dir, record)
-  type    = record[:source].end_with?('/diff') ? 'diff' : 'article'
-  date    = record[:date].to_s
-  hash    = (record[:hash] || 'unknown')[0, 8]
-  fname   = "#{date}-#{hash}-#{type}.md"
+  type  = record[:source].end_with?('/diff') ? 'diff' : 'article'
+  date  = record[:date].to_s
+  fname = "#{date}-#{type}.md"
   content = <<~MD
     ---
     source: #{record[:source]}
     date: #{date}
-    hash: #{record[:hash]}
     type: #{type}
     ---
     #{record[:content]}
@@ -103,8 +101,8 @@ end
 namespace :generate do
   def generate_trunk(klass_name, config_key)
     require_generate_deps
-    since  = ENV['SINCE'] or abort "SINCE required (e.g., SINCE=2026-04-08)"
-    before = (Date.parse(since) + 1).iso8601   # 1日チャンク固定
+    since  = ENV['SINCE']  or abort "SINCE required (e.g., SINCE=2026-04-08)"
+    before = ENV['BEFORE'] or abort "BEFORE required (e.g., BEFORE=2026-04-09)"
 
     cfg       = RubyKnowledgeDb::Config.load
     collector = Object.const_get(klass_name).new(cfg['sources'][config_key])
