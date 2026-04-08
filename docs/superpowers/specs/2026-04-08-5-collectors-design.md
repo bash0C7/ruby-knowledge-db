@@ -45,11 +45,11 @@ class TrunkChangesCollector
   def collect(since: nil)
     date_range(since).flat_map do |date|
       @git.commits_for_date(date, @branch).flat_map do |hash|
-        diff    = @git.show(hash)
-        article = @generator.call(context: build_context(hash))
+        ctx     = build_context(hash)           # show は1回だけ呼ぶ
+        article = @generator.call(context: ctx)
         [
-          { content: diff,    source: @source_diff },
-          { content: article, source: @source_article }
+          { content: ctx[:show_output], source: @source_diff },
+          { content: article,           source: @source_article }
         ]
       end
     end
@@ -57,6 +57,8 @@ class TrunkChangesCollector
 
   private
 
+  # Date.today はマシンのタイムゾーン（JST）で評価される
+  # since の ISO8601 文字列も Date.parse で日付部分のみ使用
   def date_range(since)
     start_date = since ? Date.parse(since) : Date.today - DEFAULT_DAYS
     (start_date..Date.today).to_a
@@ -67,7 +69,7 @@ class TrunkChangesCollector
     {
       hash:               hash,
       metadata:           metadata,
-      show_output:        @git.show(hash),
+      show_output:        @git.show(hash),   # ここで1回だけ呼ぶ、collect 内で再利用
       changed_files:      [],
       dependency_files:   [],
       project_meta_files: [],
