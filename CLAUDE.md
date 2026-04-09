@@ -211,9 +211,7 @@ embedding.pack("f*")   # float 配列 → blob
 |-------------------|------|
 | `../chiebukuro-mcp/` | MCP サーバー（query / semantic_search ツール、schema リソース）|
 | `../ruby-knowledge-store/` | Store（write）/ Embedder（ruri-v3）/ Migrator |
-| `../picoruby-trunk-changes-generator/` | PicoRuby trunk 変更収集（trunk-changes-diary 使用）|
-| `../cruby-trunk-changes-generator/` | CRuby trunk 変更収集 |
-| `../mruby-trunk-changes-generator/` | mruby trunk 変更収集 |
+| `config/sources.yml` | trunk-changes 収集対象リポジトリ設定（`*_trunk` キーから Rake タスク自動生成）|
 | `../rurema/` | rurema doctree RD パース（BitClust::RRDParser）|
 | `../picoruby-docs/` | PicoRuby RBS + README 収集 |
 | `lib/ruby_knowledge_db/orchestrator.rb` | 全ソース一括更新オーケストレーション |

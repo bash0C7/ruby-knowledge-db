@@ -1,4 +1,5 @@
 require 'rake/testtask'
+require_relative 'lib/ruby_knowledge_db/config'
 
 Rake::TestTask.new(:test) do |t|
   t.libs << 'test'
@@ -15,14 +16,11 @@ def require_base
   require 'date'
   require 'fileutils'
   require 'tmpdir'
-  require_relative 'lib/ruby_knowledge_db/config'
 end
 
 def require_generate_deps
   require_base
-  require 'picoruby_trunk_changes_generator'
-  require 'cruby_trunk_changes_generator'
-  require 'mruby_trunk_changes_generator'
+  require 'trunk_changes'
 end
 
 def require_store_deps
@@ -107,126 +105,114 @@ def extract_title(content, fallback)
   line ? line.sub(/^# /, '').strip : fallback
 end
 
-# ---- Phase 1: generate ----
+# ---- trunk-changes 共通ヘルパー ----
+def build_trunk_collector(source_cfg)
+  repo_path = File.expand_path(source_cfg['repo_path'])
+  git = GitOps.new(repo_path)
+  git.setup(source_cfg['clone_url'], source_cfg['branch'], since_date: ENV['SINCE'])
+  gen = ContentGenerator.new(
+    repo: source_cfg['repo'],
+    prompt_supplement: source_cfg['prompt_supplement']
+  )
+  TrunkChangesCollector.new(
+    repo:              source_cfg['repo'],
+    branch:            source_cfg['branch'],
+    source_diff:       source_cfg['source_diff'],
+    source_article:    source_cfg['source_article'],
+    git_ops:           git,
+    content_generator: gen
+  )
+end
+
+# ---- Phase 1: generate（動的タスク生成） ----
 namespace :generate do
-  def generate_trunk(klass_name, config_key)
-    require_generate_deps
-    since  = ENV['SINCE']  or abort "SINCE required (e.g., SINCE=2026-04-08)"
-    before = ENV['BEFORE'] or abort "BEFORE required (e.g., BEFORE=2026-04-09)"
+  RubyKnowledgeDb::Config.load['sources'].each_key do |key|
+    next unless key.end_with?('_trunk')
 
-    cfg       = RubyKnowledgeDb::Config.load
-    collector = Object.const_get(klass_name).new(cfg['sources'][config_key])
-    records   = collector.collect(since: since, before: before)
+    desc "Generate #{key} changes (SINCE=yyyy-mm-dd BEFORE=yyyy-mm-dd)"
+    task key.to_sym do
+      require_generate_deps
+      since  = ENV['SINCE']  or abort "SINCE required (e.g., SINCE=2026-04-08)"
+      before = ENV['BEFORE'] or abort "BEFORE required (e.g., BEFORE=2026-04-09)"
+      cfg    = RubyKnowledgeDb::Config.load
+      source = cfg['sources'][key]
 
-    tmpdir = Dir.mktmpdir(["#{config_key}_", "_#{since}_#{before}"])
-    records.each { |r| write_md(tmpdir, r) }
+      collector = build_trunk_collector(source)
+      records   = collector.collect(since: since, before: before)
 
-    puts "Generated #{records.size} records"
-    puts "DIR=#{tmpdir}"
-  end
-
-  desc "Generate picoruby trunk changes to tmpdir (SINCE=yyyy-mm-dd BEFORE=yyyy-mm-dd)"
-  task :picoruby_trunk do
-    generate_trunk('PicorubyTrunkChangesGenerator::Collector', 'picoruby_trunk')
-  end
-
-  desc "Generate mruby trunk changes to tmpdir (SINCE=yyyy-mm-dd BEFORE=yyyy-mm-dd)"
-  task :mruby_trunk do
-    generate_trunk('MrubyTrunkChangesGenerator::Collector', 'mruby_trunk')
-  end
-
-  desc "Generate CRuby trunk changes to tmpdir (SINCE=yyyy-mm-dd BEFORE=yyyy-mm-dd)"
-  task :cruby_trunk do
-    generate_trunk('CrubyTrunkChangesGenerator::Collector', 'cruby_trunk')
+      tmpdir = Dir.mktmpdir(["#{key}_", "_#{since}_#{before}"])
+      records.each { |r| write_md(tmpdir, r) }
+      puts "Generated #{records.size} records"
+      puts "DIR=#{tmpdir}"
+    end
   end
 end
 
-# ---- Phase 2a: import to SQLite ----
+# ---- Phase 2a: import to SQLite（動的タスク生成） ----
 namespace :import do
-  def import_trunk(config_key)
-    require_import_deps
-    dir = ENV['DIR'] or abort "DIR required (output of rake generate:#{config_key})"
+  RubyKnowledgeDb::Config.load['sources'].each_key do |key|
+    next unless key.end_with?('_trunk')
 
-    cfg   = RubyKnowledgeDb::Config.load
-    store = build_store(cfg)
+    desc "Import #{key} changes from tmpdir to SQLite (DIR=path)"
+    task key.to_sym do
+      require_import_deps
+      dir = ENV['DIR'] or abort "DIR required (output of rake generate:#{key})"
 
-    files = Dir.glob(File.join(dir, '*.md')).sort
-    stored = skipped = 0
-    files.each do |path|
-      rec = parse_md(path)
-      next unless rec
-      id = store.store(rec[:content], source: rec[:source])
-      id ? (stored += 1) : (skipped += 1)
+      cfg   = RubyKnowledgeDb::Config.load
+      store = build_store(cfg)
+
+      files = Dir.glob(File.join(dir, '*.md')).sort
+      stored = skipped = 0
+      files.each do |path|
+        rec = parse_md(path)
+        next unless rec
+        id = store.store(rec[:content], source: rec[:source])
+        id ? (stored += 1) : (skipped += 1)
+      end
+
+      store.close
+      puts "import #{key}: stored=#{stored}, skipped=#{skipped}"
     end
-
-    store.close
-    puts "import #{config_key}: stored=#{stored}, skipped=#{skipped}"
-  end
-
-  desc "Import picoruby trunk changes from tmpdir to SQLite (DIR=path)"
-  task :picoruby_trunk do
-    import_trunk('picoruby_trunk')
-  end
-
-  desc "Import mruby trunk changes from tmpdir to SQLite (DIR=path)"
-  task :mruby_trunk do
-    import_trunk('mruby_trunk')
-  end
-
-  desc "Import CRuby trunk changes from tmpdir to SQLite (DIR=path)"
-  task :cruby_trunk do
-    import_trunk('cruby_trunk')
   end
 end
 
-# ---- Phase 2b: post to esa ----
+# ---- Phase 2b: post to esa（動的タスク生成） ----
 namespace :esa do
-  def post_trunk(config_key)
-    require_esa_deps
-    dir = ENV['DIR'] or abort "DIR required (output of rake generate:#{config_key})"
+  RubyKnowledgeDb::Config.load['sources'].each_key do |key|
+    next unless key.end_with?('_trunk')
 
-    cfg      = RubyKnowledgeDb::Config.load
-    esa_cfg  = cfg['esa']                                  or abort "esa config missing"
-    category = esa_cfg.dig('sources', config_key, 'category') or
-               abort "esa.sources.#{config_key}.category missing"
-    writer   = RubyKnowledgeDb::EsaWriter.new(
-      team:     esa_cfg['team'],
-      category: category,
-      wip:      esa_cfg['wip']
-    )
+    desc "Post #{key} changes from tmpdir to esa (DIR=path)"
+    task key.to_sym do
+      require_esa_deps
+      dir = ENV['DIR'] or abort "DIR required (output of rake generate:#{key})"
 
-    files = Dir.glob(File.join(dir, '*-article.md')).sort
-    posted = 0
-    files.each do |path|
-      rec   = parse_md(path)
-      next unless rec
-      fname = File.basename(path, '.md')
-      title = extract_title(rec[:content], fname)
-      res   = writer.post(name: title, body_md: rec[:content])
-      if res['number']
-        puts "Posted: ##{res['number']} #{res['full_name']}"
-        posted += 1
-      else
-        warn "ERROR posting #{path}: #{res.inspect}"
+      cfg      = RubyKnowledgeDb::Config.load
+      esa_cfg  = cfg['esa']                                  or abort "esa config missing"
+      category = esa_cfg.dig('sources', key, 'category')     or abort "esa.sources.#{key}.category missing"
+      writer   = RubyKnowledgeDb::EsaWriter.new(
+        team:     esa_cfg['team'],
+        category: category,
+        wip:      esa_cfg['wip']
+      )
+
+      files = Dir.glob(File.join(dir, '*-article.md')).sort
+      posted = 0
+      files.each do |path|
+        rec   = parse_md(path)
+        next unless rec
+        fname = File.basename(path, '.md')
+        title = extract_title(rec[:content], fname)
+        res   = writer.post(name: title, body_md: rec[:content])
+        if res['number']
+          puts "Posted: ##{res['number']} #{res['full_name']}"
+          posted += 1
+        else
+          warn "ERROR posting #{path}: #{res.inspect}"
+        end
       end
+
+      puts "esa #{key}: posted=#{posted}"
     end
-
-    puts "esa #{config_key}: posted=#{posted}"
-  end
-
-  desc "Post picoruby trunk changes from tmpdir to esa (DIR=path)"
-  task :picoruby_trunk do
-    post_trunk('picoruby_trunk')
-  end
-
-  desc "Post mruby trunk changes from tmpdir to esa (DIR=path)"
-  task :mruby_trunk do
-    post_trunk('mruby_trunk')
-  end
-
-  desc "Post CRuby trunk changes from tmpdir to esa (DIR=path)"
-  task :cruby_trunk do
-    post_trunk('cruby_trunk')
   end
 end
 

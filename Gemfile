@@ -13,9 +13,6 @@ gem 'trunk_changes_diary',               path: '../trunk-changes-diary'
 gem 'chiebukuro_mcp',                    path: '../chiebukuro-mcp'
 gem 'ruby_knowledge_store',              path: '../ruby-knowledge-store'
 
-gem 'picoruby_trunk_changes_generator',  path: '../picoruby-trunk-changes-generator'
-gem 'cruby_trunk_changes_generator',     path: '../cruby-trunk-changes-generator'
-gem 'mruby_trunk_changes_generator',     path: '../mruby-trunk-changes-generator'
 gem 'rurema_collector',                  path: '../rurema-collector'
 gem 'picoruby_docs_collector',           path: '../picoruby-docs-collector'
 

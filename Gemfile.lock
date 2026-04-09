@@ -16,27 +16,9 @@ PATH
     chiebukuro_mcp (0.1.0)
 
 PATH
-  remote: ../cruby-trunk-changes-generator
-  specs:
-    cruby_trunk_changes_generator (0.1.0)
-      trunk_changes_diary
-
-PATH
-  remote: ../mruby-trunk-changes-generator
-  specs:
-    mruby_trunk_changes_generator (0.1.0)
-      trunk_changes_diary
-
-PATH
   remote: ../picoruby-docs-collector
   specs:
     picoruby_docs_collector (0.1.0)
-
-PATH
-  remote: ../picoruby-trunk-changes-generator
-  specs:
-    picoruby_trunk_changes_generator (0.1.0)
-      trunk_changes_diary
 
 PATH
   remote: ../ruby-knowledge-store
@@ -111,12 +93,9 @@ PLATFORMS
 DEPENDENCIES
   bitclust-core!
   chiebukuro_mcp!
-  cruby_trunk_changes_generator!
   informers
   mcp
-  mruby_trunk_changes_generator!
   picoruby_docs_collector!
-  picoruby_trunk_changes_generator!
   rake
   ruby_knowledge_store!
   rurema_collector!
@@ -130,7 +109,6 @@ CHECKSUMS
   bigdecimal (4.1.0) sha256=6dc07767aa3dc456ccd48e7ae70a07b474e9afd7c5bc576f80bd6da5c8dd6cae
   bitclust-core (1.4.0)
   chiebukuro_mcp (0.1.0)
-  cruby_trunk_changes_generator (0.1.0)
   drb (2.2.3) sha256=0b00d6fdb50995fe4a45dea13663493c841112e4068656854646f418fda13373
   ffi (1.17.4-arm64-darwin) sha256=19071aaf1419251b0a46852abf960e77330a3b334d13a4ab51d58b31a937001b
   ffi (1.17.4-x86_64-darwin) sha256=aa70390523cf3235096cf64962b709b4cfbd5c082a2cb2ae714eb0fe2ccda496
@@ -140,13 +118,11 @@ CHECKSUMS
   json (2.19.3) sha256=289b0bb53052a1fa8c34ab33cc750b659ba14a5c45f3fcf4b18762dc67c78646
   json-schema (6.2.0) sha256=e8bff46ed845a22c1ab2bd0d7eccf831c01fe23bb3920caa4c74db4306813666
   mcp (0.10.0) sha256=09b9231eb16dff75cc7b8a95817c8acfcf4d1cab8d34f350671e43e765242b57
-  mruby_trunk_changes_generator (0.1.0)
   nkf (0.2.0) sha256=fbc151bda025451f627fafdfcb3f4f13d0b22ae11f58c6d3a2939c76c5f5f126
   onnxruntime (0.11.1-arm64-darwin) sha256=6d205e1adfcb77f0330b46ea9dcd3da9199034408dd5f58d56afca8e70fb686c
   onnxruntime (0.11.1-x86_64-darwin) sha256=acdcbfbc937273fb27fd98587fde18199bb03dcd525f2da5324da42c97631eb9
   onnxruntime (0.11.1-x86_64-linux) sha256=90a47c9ab70103cdd4dd2b99b5179dfed909b44ceb77a1cf076e9dcff925079c
   picoruby_docs_collector (0.1.0)
-  picoruby_trunk_changes_generator (0.1.0)
   power_assert (3.0.1) sha256=8ce9876716cc74e863fcd4cdcdc52d792bd983598d1af3447083a3a9a4d34103
   progressbar (1.13.0) sha256=18c921d1c527dbe7eba3c5a07a1e3bcdd5e42fc18276f5711187a7489448be78
   public_suffix (7.0.5) sha256=1a8bb08f1bbea19228d3bed6e5ed908d1cb4f7c2726d18bd9cadf60bc676f623
