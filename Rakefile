@@ -65,9 +65,19 @@ end
 
 # MD ファイルに YAML frontmatter 付きで保存（日単位: YYYY-MM-DD-{type}.md）
 def write_md(dir, record)
-  type  = record[:source].end_with?('/diff') ? 'diff' : 'article'
-  date  = record[:date].to_s
-  fname = "#{date}-#{type}.md"
+  source = record[:source]
+  date   = record[:date].to_s
+
+  if source.end_with?('/diff')
+    type  = 'diff'
+    fname = "#{date}-diff.md"
+  elsif source =~ %r{/article/(.+)$}
+    type  = 'article'
+    fname = "#{date}-article-#{$1}.md"
+  else
+    type  = 'article'
+    fname = "#{date}-article.md"
+  end
   content = <<~MD
     ---
     source: #{record[:source]}
