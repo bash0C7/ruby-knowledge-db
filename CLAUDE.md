@@ -83,6 +83,7 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 |-----------|------|
 | `picoruby/picoruby:trunk/article` | PicoRuby trunk 変更記事（AI 生成 or MD import）|
 | `picoruby/picoruby:trunk/diff` | PicoRuby trunk 生 diff |
+| `picoruby/picoruby:trunk/article/{submodule}` | PicoRuby submodule 変更記事 |
 | `ruby/ruby:trunk/article` | CRuby trunk 変更記事 |
 | `mruby/mruby:trunk/article` | mruby trunk 変更記事 |
 | `rurema/doctree:ruby3.3/{lib}` | るりま Ruby 3.3 ライブラリドキュメント |
@@ -150,7 +151,7 @@ ORDER BY v.distance
 trunk 変更記事の生成・格納・投稿は 3 フェーズに分離:
 
 ```bash
-# Phase 1: generate — shallow clone → merge/non-merge 判定 → Claude CLI で daily article 生成
+# Phase 1: generate — full clone（/tmp キャッシュ）→ 時系列 diff → Claude CLI で daily article + submodule article 生成
 APP_ENV=test SINCE=2026-04-05 BEFORE=2026-04-06 bundle exec rake generate:picoruby_trunk
 # → DIR=... が出力される（tmpdir パス）
 
@@ -163,7 +164,7 @@ APP_ENV=test DIR=$DIR bundle exec rake esa:picoruby_trunk
 
 - SINCE/BEFORE: 半開区間 `[since, before)`。1日分なら `SINCE=2026-04-05 BEFORE=2026-04-06`
 - Claude CLI は sonnet モデルを使用（trunk-changes-diary のデフォルト）
-- MD ファイル名: `YYYY-MM-DD-diff.md` / `YYYY-MM-DD-article.md`
+- MD ファイル名: `YYYY-MM-DD-diff.md` / `YYYY-MM-DD-article.md` / `YYYY-MM-DD-article-{submodule}.md`
 
 ### APP_ENV
 
@@ -175,13 +176,13 @@ APP_ENV=test DIR=$DIR bundle exec rake esa:picoruby_trunk
 
 環境設定: `config/environments/{APP_ENV}.yml`
 
-### merge commit の扱い（trunk-changes-diary）
+### diff 生成方式（trunk-changes-diary）
 
-- **merge commit**: `git diff M^1..M --ignore-submodules` で PR 全体の差分を取得。`git log M^1..M --oneline` でコミット一覧を付与。「PR 全体をまとめて解説」する記事を生成
-- **non-merge commit**（直接 push / rebase）: `git diff parent..hash --ignore-submodules` で個別差分
-- **orphan / shallow boundary**: `git diff-tree --stat` でフォールバック（サイズ安全）
-- **shallow clone**: `--shallow-since=SINCE-2day` で merge commit の M^1 が確実に取得できる深さを確保
-- **submodule**: `--ignore-submodules` で除外（将来別コンテキストで記事生成予定）
+- **full clone**: `/tmp/trunk-changes-repos/` にキャッシュ。`--no-single-branch` で全ブランチ取得
+- **時系列 diff**: `git diff --ignore-submodules prev_hash..hash` で前コミットとの差分。`last_commit_before(date, branch)` で起点取得
+- **merge commit**: `is_merge?` フラグ + `merge_log` でコミット一覧付与。PR 全体をまとめて解説する記事を生成
+- **submodule 記事**: `git submodule update --init --depth=1` で clone。`submodule_changes` で SHA range 取得、`submodule_log` + `submodule_diff_stat` を Claude CLI に渡して個別記事生成
+- source: `picoruby/picoruby:trunk/article/{submodule_name}`
 
 ### since 永続化
 `db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。

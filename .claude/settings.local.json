@@ -65,7 +65,12 @@
       "Bash(git:*)",
       "Bash(echo \"EXIT: $?\")",
       "Bash(cp /tmp/shallow_cleaned .git/shallow)",
-      "Read(//tmp/picoruby_test_clone/.git/**)"
+      "Read(//tmp/picoruby_test_clone/.git/**)",
+      "WebSearch",
+      "Bash(APP_ENV=test SINCE=2026-04-04 BEFORE=2026-04-06 bundle exec rake generate:picoruby_trunk)",
+      "Read(//private/var/folders/z7/snn4qff17bs_pz7s4rm26y0c0000gn/T/picoruby_trunk_20260409-44835-iqbtdo_2026-04-04_2026-04-06/**)",
+      "Bash(DIR=/var/folders/z7/snn4qff17bs_pz7s4rm26y0c0000gn/T/picoruby_trunk_20260409-44835-iqbtdo_2026-04-04_2026-04-06 APP_ENV=test bundle exec rake import:picoruby_trunk)",
+      "Bash(DIR=/var/folders/z7/snn4qff17bs_pz7s4rm26y0c0000gn/T/picoruby_trunk_20260409-44835-iqbtdo_2026-04-04_2026-04-06 APP_ENV=test bundle exec rake esa:picoruby_trunk)"
     ]
   },
   "enableAllProjectMcpServers": true
