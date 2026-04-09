@@ -195,14 +195,25 @@ namespace :esa do
         wip:      esa_cfg['wip']
       )
 
+      # key から短縮名を導出（picoruby_trunk → picoruby）
+      short_name = key.sub(/_trunk$/, '')
+
       files = Dir.glob(File.join(dir, '*-article.md')).sort
       posted = 0
       files.each do |path|
         rec   = parse_md(path)
         next unless rec
-        fname = File.basename(path, '.md')
-        title = extract_title(rec[:content], fname)
-        res   = writer.post(name: title, body_md: rec[:content])
+        # ファイル名から日付を抽出（YYYY-MM-DD-article.md）
+        date = File.basename(path)[/\A(\d{4}-\d{2}-\d{2})/, 1]
+        next unless date
+        y, m, d = date.split('-')
+        date_category = "#{category}/#{y}/#{m}/#{d}"
+        title = "#{date}-#{short_name}-trunk-changes"
+
+        date_writer = RubyKnowledgeDb::EsaWriter.new(
+          team: esa_cfg['team'], category: date_category, wip: esa_cfg['wip']
+        )
+        res = date_writer.post(name: title, body_md: rec[:content])
         if res['number']
           puts "Posted: ##{res['number']} #{res['full_name']}"
           posted += 1

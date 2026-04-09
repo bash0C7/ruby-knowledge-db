@@ -2,3 +2,5 @@
 PicorubyTrunk::Collector: '2026-04-02T18:48:20+09:00'
 Rurema::Collector: '2026-04-02T18:48:20+09:00'
 PicorubyDocs::Collector: '2026-04-02T18:48:20+09:00'
+PicorubyDocsCollector::Collector: '2026-04-10'
+RuremaCollector::Collector: '2026-04-10'

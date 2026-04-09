@@ -26,7 +26,7 @@ sources:
 
   rurema:
     doctree_path: ~/dev/src/github.com/rurema/doctree
-    version: "3.3.0"
+    version: "4.0.0"
 
   picoruby_docs:
     repo_path: ~/dev/src/github.com/picoruby/picoruby
