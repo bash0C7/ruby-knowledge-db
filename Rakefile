@@ -259,6 +259,54 @@ end
 
 # ---- db:stats: DB 状態確認（sqlite_vec 経由必須） ----
 namespace :db do
+  desc "Re-embed all memories with enriched embedding text (source prefix + truncation)"
+  task :reembed do
+    require_store_deps
+
+    cfg = RubyKnowledgeDb::Config.load
+    db_path = File.expand_path(cfg['db_path'], __dir__)
+    abort "DB not found: #{db_path}" unless File.exist?(db_path)
+
+    embedder = RubyKnowledgeStore::Embedder.new
+    store = RubyKnowledgeStore::Store.new(db_path, embedder: embedder)
+
+    db = SQLite3::Database.new(db_path)
+    db.results_as_hash = true
+    db.enable_load_extension(true)
+    SqliteVec.load(db)
+    db.enable_load_extension(false)
+
+    rows = db.execute('SELECT id, content, source FROM memories ORDER BY id')
+    puts "Re-embedding #{rows.size} records..."
+
+    # Clear existing vec data
+    db.execute('DELETE FROM memories_vec')
+
+    embedded = skipped = 0
+    rows.each_with_index do |row, i|
+      content = row['content']
+      source = row['source']
+      memory_id = row['id']
+
+      if content.length < RubyKnowledgeStore::Store::EMBEDDING_MIN_CONTENT_LENGTH
+        skipped += 1
+        next
+      end
+
+      embedding_text = store.send(:build_embedding_text, content, source)
+      embedding = embedder.embed(embedding_text)
+      blob = embedding.pack('f*')
+      db.execute('INSERT INTO memories_vec(memory_id, embedding) VALUES (?, ?)', [memory_id, blob])
+      embedded += 1
+
+      print "\r  #{i + 1}/#{rows.size} (embedded=#{embedded}, skipped=#{skipped})" if (i + 1) % 50 == 0 || i + 1 == rows.size
+    end
+    puts "\nDone: embedded=#{embedded}, skipped=#{skipped}"
+
+    db.close
+    store.close
+  end
+
   desc "Show DB stats (requires sqlite_vec for vec0 access)"
   task :stats do
     require_base
