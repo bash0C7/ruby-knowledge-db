@@ -86,8 +86,8 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 | `picoruby/picoruby:trunk/article/{submodule}` | PicoRuby submodule 変更記事 |
 | `ruby/ruby:trunk/article` | CRuby trunk 変更記事 |
 | `mruby/mruby:trunk/article` | mruby trunk 変更記事 |
-| `rurema/doctree:ruby3.3/{lib}` | るりま Ruby 3.3 ライブラリドキュメント |
-| `rurema/doctree:ruby3.3/{lib}#{class}` | るりま Ruby 3.3 クラスドキュメント |
+| `rurema/doctree:ruby4.0/{lib}` | るりま Ruby 4.0 ライブラリドキュメント |
+| `rurema/doctree:ruby4.0/{lib}#{class}` | るりま Ruby 4.0 クラスドキュメント |
 | `picoruby/picoruby:docs/{gem}` | PicoRuby gem RBS + README |
 
 ---
@@ -165,6 +165,34 @@ APP_ENV=test DIR=$DIR bundle exec rake esa:picoruby_trunk
 - SINCE/BEFORE: 半開区間 `[since, before)`。1日分なら `SINCE=2026-04-05 BEFORE=2026-04-06`
 - Claude CLI は sonnet モデルを使用（trunk-changes-diary のデフォルト）
 - MD ファイル名: `YYYY-MM-DD-diff.md` / `YYYY-MM-DD-article.md` / `YYYY-MM-DD-article-{submodule}.md`
+
+### rake daily（日次一括処理）
+
+```bash
+# 昨日分を自動処理（SINCE=昨日, BEFORE=今日 を自動設定）
+APP_ENV=production bundle exec rake daily
+
+# 特定日を指定
+APP_ENV=production SINCE=2026-04-10 BEFORE=2026-04-11 bundle exec rake daily
+```
+
+全 `_trunk` ソース（picoruby/cruby/mruby）を順次 generate → import → esa 投稿。Store は共有して1回だけ開く。
+
+### esa フルパスルール
+
+記事は決定論的なフルパスで投稿:
+```
+{category}/{yyyy}/{mm}/{dd}/{yyyy-mm-dd}-{short_name}-trunk-changes
+```
+例: `production/picoruby/trunk-changes/2026/04/08/2026-04-08-picoruby-trunk-changes`
+
+- `short_name`: sources.yml のキーから `_trunk` を除去（`picoruby_trunk` → `picoruby`）
+- `category`: `config/environments/{APP_ENV}.yml` の `esa.sources.{key}.category`
+
+### 記事見出しフォーマット（必須）
+
+通常コミット: `### [変更内容タイトル](https://github.com/repo/commit/hash) 日時`
+submodule: `### (submodule名)[submodule GitHub URL] [変更内容タイトル](コミットURL) 日時`
 
 ### APP_ENV
 
