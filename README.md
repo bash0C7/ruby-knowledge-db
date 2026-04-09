@@ -200,6 +200,25 @@ claude mcp add-json chiebukuro-mcp \
 | `chiebukuro_semantic_search_<db>` | 自然言語 → vec0 KNN（768次元 ruri-v3）`semantic_search` 設定のある DB のみ |
 | `schema://<db>` | スキーマ説明リソース |
 
+## DB 操作の注意
+
+**sqlite3 CLI 禁止** — システムの sqlite3 は vec0 拡張を持たないため、`memories_vec` テーブルへのアクセスでエラーになる。DB への問い合わせは必ず Ruby + `sqlite_vec` gem 経由で行うこと。
+
+```bash
+# DB 状態確認（vec0 含む全テーブル対応）
+bundle exec rake db:stats
+```
+
+## DB 設計ノート
+
+### embedding カラムと memories_vec の関係
+
+memories テーブルの `embedding` カラムは NULL（全件）。ベクトルデータは `memories_vec`（vec0 仮想テーブル）にのみ格納する設計。semantic_search は memories_vec に対して KNN クエリを実行するため、memories.embedding は使用しない。
+
+### rurema の source 値
+
+rurema レコードの source はライブラリ単位で細分化される（例: `rurema/doctree:ruby4.0/yaml`, `rurema/doctree:ruby4.0/string`）。`GROUP BY source` の上位には現れないが、`WHERE source LIKE 'rurema%'` で全件取得可能。
+
 ## DB スキーマ
 
 `ruby-knowledge-store` リポジトリの `migrations/001_schema.sql` 参照。`_sqlite_mcp_meta` テーブルにスキーマ説明文を同居管理。

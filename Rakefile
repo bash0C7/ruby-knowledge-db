@@ -257,6 +257,59 @@ namespace :update do
   end
 end
 
+# ---- db:stats: DB 状態確認（sqlite_vec 経由必須） ----
+namespace :db do
+  desc "Show DB stats (requires sqlite_vec for vec0 access)"
+  task :stats do
+    require_base
+    require 'sqlite3'
+    require 'sqlite_vec'
+
+    cfg = RubyKnowledgeDb::Config.load
+    db_path = File.expand_path(cfg['db_path'], __dir__)
+    abort "DB not found: #{db_path}" unless File.exist?(db_path)
+
+    db = SQLite3::Database.new(db_path, readonly: true)
+    db.enable_load_extension(true)
+    SqliteVec.load(db)
+    db.enable_load_extension(false)
+
+    total      = db.get_first_value("SELECT count(*) FROM memories")
+    vec_total  = db.get_first_value("SELECT count(*) FROM memories_vec")
+    fts_total  = db.get_first_value("SELECT count(*) FROM memories_fts")
+    rurema     = db.get_first_value("SELECT count(*) FROM memories WHERE source LIKE 'rurema%'")
+    with_emb   = db.get_first_value("SELECT count(*) FROM memories WHERE embedding IS NOT NULL")
+
+    puts "=== DB Stats: #{db_path} ==="
+    puts "memories total:     #{total}"
+    puts "memories_vec total: #{vec_total}"
+    puts "memories_fts total: #{fts_total}"
+    puts "rurema total:       #{rurema}"
+    puts "embedding in memories (expect 0): #{with_emb}"
+    puts ""
+
+    puts "--- source distribution (top 15) ---"
+    db.execute("SELECT source, count(*) as cnt FROM memories GROUP BY source ORDER BY cnt DESC LIMIT 15").each do |row|
+      puts "  #{row[1].to_s.rjust(5)}  #{row[0]}"
+    end
+
+    puts ""
+    puts "--- consistency check ---"
+    if total == vec_total
+      puts "OK: memories (#{total}) == memories_vec (#{vec_total})"
+    else
+      puts "WARN: memories (#{total}) != memories_vec (#{vec_total})"
+    end
+    if total == fts_total
+      puts "OK: memories (#{total}) == memories_fts (#{fts_total})"
+    else
+      puts "WARN: memories (#{total}) != memories_fts (#{fts_total})"
+    end
+
+    db.close
+  end
+end
+
 # ---- daily: 昨日分の全ソース一括処理 ----
 desc "Run daily pipeline: generate → import → esa for all trunk sources (SINCE/BEFORE auto-set to yesterday/today)"
 task :daily do

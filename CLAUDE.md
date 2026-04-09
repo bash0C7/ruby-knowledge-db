@@ -224,6 +224,18 @@ bundle exec ruby scripts/import_md_files.rb <dir> [source]
 # ファイル名パターン: YYYY-MM-DD.md のみ（重複ファイル自動除外）
 ```
 
+### sqlite3 CLI 禁止（sqlite_vec 経由必須）
+
+システムの `/usr/bin/sqlite3` は vec0 拡張を持たないため、`memories_vec` テーブルにアクセスすると `no such module: vec0` エラーになる。**DB への問い合わせは必ず Ruby + `sqlite_vec` gem 経由で行うこと。** `sqlite3` コマンドラインツールの直接使用は禁止。
+
+DB 状態確認は `bundle exec rake db:stats` を使用する。
+
+### memories.embedding は NULL（仕様）
+memories テーブルの embedding カラムは全件 NULL。ベクトルは memories_vec にのみ格納。chiebukuro-mcp の semantic_search は memories_vec を使うため問題なし。
+
+### rurema の source 値は細分化（仕様）
+rurema は `rurema/doctree:ruby4.0/{lib}` 形式で source が細分化される。GROUP BY source の上位に出ないのは仕様。全件確認は `WHERE source LIKE 'rurema%'`。
+
 ### FTS5 の日本語対応
 `tokenize='trigram'` を使用（3文字以上の部分一致）。2文字以下の検索語は FTS5 にヒットしない。
 
