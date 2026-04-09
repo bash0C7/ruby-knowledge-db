@@ -165,6 +165,7 @@ APP_ENV=test DIR=$DIR bundle exec rake esa:picoruby_trunk
 - SINCE/BEFORE: 半開区間 `[since, before)`。1日分なら `SINCE=2026-04-05 BEFORE=2026-04-06`
 - Claude CLI は sonnet モデルを使用（trunk-changes-diary のデフォルト）
 - MD ファイル名: `YYYY-MM-DD-diff.md` / `YYYY-MM-DD-article.md` / `YYYY-MM-DD-article-{submodule}.md`
+- import 対象: article + diff 全ファイルが DB に格納される。esa には article のみ投稿（`*-article.md` マッチ）
 
 ### rake daily（日次一括処理）
 

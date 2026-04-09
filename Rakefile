@@ -99,11 +99,6 @@ def parse_md(path)
   { source: fm['source'], type: fm['type'], content: content }
 end
 
-# 記事 MD から esa タイトルを抽出（最初の # 見出し or 日付）
-def extract_title(content, fallback)
-  line = content.lines.find { |l| l.start_with?('# ') }
-  line ? line.sub(/^# /, '').strip : fallback
-end
 
 # ---- trunk-changes 共通ヘルパー ----
 def build_trunk_collector(source_cfg)

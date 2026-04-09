@@ -111,6 +111,8 @@ APP_ENV=test DIR=$DIR bundle exec rake esa:picoruby_trunk
 
 picoruby 以外にも `cruby_trunk`, `mruby_trunk` の同名タスクがあります。
 
+**import の対象**: generate で生成される MD ファイル（article + diff）は全て DB に格納される。esa には article のみ投稿（`*-article.md` にマッチするファイルのみ）。diff は DB での検索用途。
+
 ### rake daily（日次一括処理）
 
 ```bash
