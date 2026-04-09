@@ -261,3 +261,80 @@ namespace :update do
     run_collector(:picoruby_docs, 'PicorubyDocsCollector::Collector', 'picoruby_docs')
   end
 end
+
+# ---- daily: 昨日分の全ソース一括処理 ----
+desc "Run daily pipeline: generate → import → esa for all trunk sources (SINCE/BEFORE auto-set to yesterday/today)"
+task :daily do
+  require_generate_deps
+  require_import_deps
+  require_esa_deps
+
+  since  = ENV['SINCE']  || (Date.today - 1).to_s
+  before = ENV['BEFORE'] || Date.today.to_s
+  puts "=== daily: #{since} → #{before} ==="
+
+  cfg     = RubyKnowledgeDb::Config.load
+  esa_cfg = cfg['esa']
+  store   = build_store(cfg)
+
+  cfg['sources'].each do |key, source_cfg|
+    next unless key.end_with?('_trunk')
+    short_name = key.sub(/_trunk$/, '')
+    puts "\n--- #{key} ---"
+
+    # Phase 1: generate
+    ENV['SINCE']  = since
+    ENV['BEFORE'] = before
+    collector = build_trunk_collector(source_cfg)
+    records   = collector.collect(since: since, before: before)
+
+    tmpdir = Dir.mktmpdir(["#{key}_", "_#{since}_#{before}"])
+    records.each { |r| write_md(tmpdir, r) }
+    puts "generate: #{records.size} records → #{tmpdir}"
+
+    next if records.empty?
+
+    # Phase 2a: import to SQLite
+    files = Dir.glob(File.join(tmpdir, '*.md')).sort
+    stored = skipped = 0
+    files.each do |path|
+      rec = parse_md(path)
+      next unless rec
+      id = store.store(rec[:content], source: rec[:source])
+      id ? (stored += 1) : (skipped += 1)
+    end
+    puts "import: stored=#{stored}, skipped=#{skipped}"
+
+    # Phase 2b: post to esa
+    next unless esa_cfg
+    category = esa_cfg.dig('sources', key, 'category')
+    next unless category
+
+    article_files = Dir.glob(File.join(tmpdir, '*-article.md')).sort
+    posted = 0
+    article_files.each do |path|
+      rec = parse_md(path)
+      next unless rec
+      date = File.basename(path)[/\A(\d{4}-\d{2}-\d{2})/, 1]
+      next unless date
+      y, m, d = date.split('-')
+      date_category = "#{category}/#{y}/#{m}/#{d}"
+      title = "#{date}-#{short_name}-trunk-changes"
+
+      writer = RubyKnowledgeDb::EsaWriter.new(
+        team: esa_cfg['team'], category: date_category, wip: esa_cfg['wip']
+      )
+      res = writer.post(name: title, body_md: rec[:content])
+      if res['number']
+        puts "esa: ##{res['number']} #{res['full_name']}"
+        posted += 1
+      else
+        warn "ERROR posting #{path}: #{res.inspect}"
+      end
+    end
+    puts "esa: posted=#{posted}"
+  end
+
+  store.close
+  puts "\n=== daily complete ==="
+end
