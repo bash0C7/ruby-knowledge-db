@@ -336,5 +336,16 @@ task :daily do
   end
 
   store.close
+
+  # DB を chiebukuro-mcp 参照先にコピー
+  copy_to = cfg['db_copy_to']
+  if copy_to
+    src = File.expand_path(cfg['db_path'], __dir__)
+    dst = File.expand_path(copy_to)
+    FileUtils.mkdir_p(File.dirname(dst))
+    FileUtils.cp(src, dst)
+    puts "db: copied to #{dst}"
+  end
+
   puts "\n=== daily complete ==="
 end

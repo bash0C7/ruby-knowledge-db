@@ -1,4 +1,5 @@
 db_path: db/ruby_knowledge.db
+db_copy_to: ~/Library/Mobile Documents/com~apple~CloudDocs/chiebukuro-mcp/db/ruby_knowledge.db
 
 esa:
   team: bash-trunk-changes
