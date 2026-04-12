@@ -3,3 +3,5 @@ vendor/
 *.db-shm
 *.db-wal
 db/*.json
+db/last_run.yml
+.claude/settings.local.json
