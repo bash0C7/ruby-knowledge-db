@@ -236,3 +236,9 @@ bundle exec rake test   # orchestrator テスト
 # 各 gem のテストは個別リポジトリで実施
 # trunk-changes-diary: cd ../trunk-changes-diary && rake test（bundler 不要）
 ```
+
+## Agent meta schema
+
+`ruby_knowledge.db` is read by the chiebukuro-mcp MCP server. The server expects the extended `_sqlite_mcp_meta` schema provided by `ruby-knowledge-store/migrations/003_extend_meta.sql`. After bumping `ruby-knowledge-store`, re-run the migrator before reapplying dotfiles meta patches.
+
+Recipe and clarification_field data itself is managed in `dotfiles/chiebukuro-mcp/scripts/meta_patches/ruby_knowledge.yml`, not here.
