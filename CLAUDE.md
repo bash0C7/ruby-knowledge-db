@@ -223,6 +223,8 @@ submodule: `### (submodule名)[submodule GitHub URL] [変更内容タイトル](
 `db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。
 `scripts/update_all.rb` が自動読み書き。ARGV[0] で手動上書き可能。
 
+**注意:** `rake daily`（trunk-changes 3フェーズパイプライン）は `last_run.yml` を**読まへんし書かへん**。trunk-changes 系の次回 SINCE は esa 側の最新投稿日（`bash-trunk-changes` team の `production/{picoruby,cruby,mruby}/trunk-changes/YYYY/MM/DD/...` パス）を事実上の bookmark として判断する。`last_run.yml` は `scripts/update_all.rb` と rurema / picoruby_docs 系 collector 専用。
+
 ### MD ファイル import（picoruby trunk）
 ```bash
 bundle exec ruby scripts/import_md_files.rb <dir> [source]
