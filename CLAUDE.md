@@ -16,19 +16,19 @@ Ruby エコシステム（PicoRuby / CRuby / mruby / rurema）のナレッジを
 
 ```
 【このリポジトリ】ruby-knowledge-db
-  ├── ../chiebukuro-mcp/                      MCP サーバー（query + semantic_search）
-  ├── ../ruby-knowledge-store/                Store / Embedder / Migrator
-  ├── ../picoruby-trunk-changes-generator/    trunk-changes-diary をライブラリとして使用
-  ├── ../cruby-trunk-changes-generator/
-  ├── ../mruby-trunk-changes-generator/
-  ├── ../rurema/                              bitclust-core で RD パース（実装済み）
-  └── ../picoruby-docs/                       RBS + README 収集（実装済み）
+  ├── ../chiebukuro-mcp/           MCP サーバー（query + semantic_search）
+  ├── ../ruby-knowledge-store/     Store / Embedder / Migrator
+  ├── ../trunk-changes-diary/      Git diff 取得・Claude CLI 記事生成エンジン
+  ├── ../rurema-collector/         rurema/doctree RD パース（BitClust::RRDParser）
+  └── ../picoruby-docs-collector/  PicoRuby RBS + README 収集
   ├── lib/ruby_knowledge_db/
-  │   └── orchestrator.rb    全ソース一括更新
+  │   ├── orchestrator.rb    全ソース一括更新
+  │   ├── esa_writer.rb      esa API 投稿
+  │   └── config.rb          APP_ENV 設定ロード
   ├── scripts/
-  │   ├── update_all.rb      手動実行エントリポイント（since 永続化: db/last_run.yml）
-  │   ├── import_md_files.rb MD ファイル一括 import（picoruby trunk 変更記事等）
-  │   └── start_mcp.sh       Claude Desktop 用起動スクリプト
+  │   ├── update_all.rb          手動実行エントリポイント（since 永続化: db/last_run.yml）
+  │   ├── import_md_files.rb     MD ファイル一括 import（picoruby trunk 変更記事等）
+  │   └── import_esa_export.rb   esa エクスポート一括 import
   └── db/
       ├── ruby_knowledge.db  本番 DB（git 管理外）
       └── last_run.yml       since 永続化（コレクタークラス名 → 最終実行時刻）
@@ -41,9 +41,9 @@ Ruby エコシステム（PicoRuby / CRuby / mruby / rurema）のナレッジを
 各 in-project gem はこのインターフェースに従う：
 
 ```ruby
-module PicorubyTrunk  # または CrubyTrunk, Rurema 等
+module RuremaCollector  # または PicorubyDocsCollector, etc.
   class Collector
-    SOURCE = "picoruby/picoruby:trunk"  # source カラムの値
+    SOURCE = "rurema/doctree:ruby4.0"  # source カラムの値（細分化される場合はプレフィクス）
 
     def initialize(config)
       # config: Hash（repo_path, work_dir 等）
@@ -57,6 +57,8 @@ module PicorubyTrunk  # または CrubyTrunk, Rurema 等
   end
 end
 ```
+
+last_run.yml のキーは完全修飾クラス名（例: `RuremaCollector::Collector`, `PicorubyDocsCollector::Collector`）。
 
 ---
 
@@ -92,13 +94,17 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 
 ---
 
-## 依存する外部リポジトリ
+## 依存する外部リポジトリ（in-project gem）
 
-| リポジトリ | ローカルパス | 使い方 |
+各 collector / 記事生成は bash0C7 配下の gem リポジトリに分離されている。開発時はいずれもローカルクローンが必要。
+
+| リポジトリ | ローカルパス | 役割 |
 |-----------|------------|--------|
-| trunk-changes-diary | `../trunk-changes-diary` | TrunkChanges クラス |
-| rurema/doctree | `~/dev/src/github.com/rurema/doctree` | RD ファイル収集対象 |
-| picoruby/picoruby | `~/dev/src/github.com/picoruby/picoruby` | docs 収集対象 |
+| trunk-changes-diary   | `../trunk-changes-diary`   | Git diff 取得・Claude CLI 記事生成エンジン |
+| rurema-collector      | `../rurema-collector`      | rurema/doctree 収集（内部で rurema/doctree を clone/参照）|
+| picoruby-docs-collector | `../picoruby-docs-collector` | picoruby/picoruby の docs（RBS + README）収集 |
+| chiebukuro-mcp        | `../chiebukuro-mcp`        | MCP サーバー（`exe/chiebukuro-mcp serve` を委譲先として使用）|
+| ruby-knowledge-store  | `../ruby-knowledge-store`  | Store / Embedder / Migrator |
 
 ---
 
@@ -252,16 +258,20 @@ embedding.pack("f*")   # float 配列 → blob
 |-------------------|------|
 | `../chiebukuro-mcp/` | MCP サーバー（query / semantic_search ツール、schema リソース）|
 | `../ruby-knowledge-store/` | Store（write）/ Embedder（ruri-v3）/ Migrator |
-| `config/sources.yml` | trunk-changes 収集対象リポジトリ設定（`*_trunk` キーから Rake タスク自動生成）|
-| `../rurema/` | rurema doctree RD パース（BitClust::RRDParser）|
-| `../picoruby-docs/` | PicoRuby RBS + README 収集 |
+| `../trunk-changes-diary/` | Git diff 取得・Claude CLI 記事生成エンジン |
+| `../rurema-collector/` | rurema doctree RD パース（BitClust::RRDParser）|
+| `../picoruby-docs-collector/` | PicoRuby RBS + README 収集 |
 | `lib/ruby_knowledge_db/orchestrator.rb` | 全ソース一括更新オーケストレーション |
+| `lib/ruby_knowledge_db/esa_writer.rb` | esa API 投稿 |
+| `lib/ruby_knowledge_db/config.rb` | APP_ENV 別設定ロード |
 | `../ruby-knowledge-store/migrations/001_schema.sql` | memories + FTS5 + vec0 + _sqlite_mcp_meta |
 | `config/chiebukuro.json.example` | DB 接続設定テンプレート（実設定は `~/chiebukuro-mcp/chiebukuro.json` へ）|
-| `config/sources.yml` | 収集対象リポジトリ設定 |
+| `config/sources.yml` | trunk-changes 収集対象リポジトリ設定（`*_trunk` キーから Rake タスク自動生成）|
+| `config/environments/{APP_ENV}.yml` | APP_ENV 別の DB パス・esa 設定 |
 | `scripts/update_all.rb` | 手動実行エントリポイント（since 永続化）|
 | `scripts/import_md_files.rb` | MD ファイル一括 import |
-| `scripts/start_mcp.sh` | MCP 起動スクリプト（SCRIPT_DIR 相対パス、環境非依存）|
-| `bin/serve` | MCP サーバー起動（`~/chiebukuro-mcp/chiebukuro.json` 優先ロード）|
+| `scripts/import_esa_export.rb` | esa エクスポート一括 import |
 | `db/last_run.yml` | since 永続化ファイル（git 管理外）|
 | `test/test_helper.rb` | StubEmbedder + 共通セットアップ |
+
+MCP サーバーの起動は `chiebukuro-mcp` リポジトリの `exe/chiebukuro-mcp serve` に委譲する（このリポジトリに `bin/serve` や `scripts/start_mcp.sh` は存在しない）。

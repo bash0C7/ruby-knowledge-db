@@ -150,6 +150,9 @@ bundle exec ruby scripts/update_all.rb 2026-01-01T00:00:00+09:00
 
 # MD ファイル一括 import（picoruby trunk 変更記事等）
 bundle exec ruby scripts/import_md_files.rb <dir> [source]
+
+# esa エクスポート一括 import
+bundle exec ruby scripts/import_esa_export.rb <dir>
 ```
 
 ## 個人設定（~/chiebukuro-mcp/）
