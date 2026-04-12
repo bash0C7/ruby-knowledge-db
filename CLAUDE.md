@@ -277,3 +277,9 @@ embedding.pack("f*")   # float 配列 → blob
 | `test/test_helper.rb` | StubEmbedder + 共通セットアップ |
 
 MCP サーバーの起動は `chiebukuro-mcp` リポジトリの `exe/chiebukuro-mcp serve` に委譲する（このリポジトリに `bin/serve` や `scripts/start_mcp.sh` は存在しない）。
+
+## Responsibility boundary (chiebukuro-mcp agent schema)
+
+This repo owns the generation and update of `ruby_knowledge.db`, plus applying `ruby-knowledge-store` migrations (including `003_extend_meta.sql`, which adds the `hints_json` / `recipe_sql` / `recipe_label` columns required by the chiebukuro-mcp agent-ready schema).
+
+**This repo does not own recipe / clarification_field / column-hint data.** That data lives in `dotfiles/chiebukuro-mcp/scripts/meta_patches/ruby_knowledge.yml` and is applied by `apply_meta_patches.rb`. Do not duplicate it here. See `chiebukuro-mcp/CLAUDE.md` for the meta schema spec.
