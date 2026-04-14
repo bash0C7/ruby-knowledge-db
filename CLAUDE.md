@@ -213,7 +213,7 @@ submodule: `### (submodule名)[submodule GitHub URL] [変更内容タイトル](
 
 ### diff 生成方式（trunk-changes-diary）
 
-- **full clone**: `/tmp/trunk-changes-repos/` にキャッシュ。`--no-single-branch` で全ブランチ取得
+- **full clone**: `~/.cache/trunk-changes-repos/` にキャッシュ（mutable に保持、`/tmp` は揮発のため使わない）。`--no-single-branch` で全ブランチ取得
 - **時系列 diff**: `git diff --ignore-submodules prev_hash..hash` で前コミットとの差分。`last_commit_before(date, branch)` で起点取得
 - **merge commit**: `is_merge?` フラグ + `merge_log` でコミット一覧付与。PR 全体をまとめて解説する記事を生成
 - **submodule 記事**: `git submodule update --init --depth=1` で clone。`submodule_changes` で SHA range 取得、`submodule_log` + `submodule_diff_stat` を Claude CLI に渡して個別記事生成

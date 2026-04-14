@@ -73,7 +73,7 @@ sources:
     repo: picoruby/picoruby          # GitHub org/repo
     branch: master                   # 対象ブランチ
     clone_url: https://github.com/picoruby/picoruby  # git clone URL
-    repo_path: /tmp/trunk-changes-repos/picoruby     # ローカルキャッシュパス
+    repo_path: ~/.cache/trunk-changes-repos/picoruby # ローカルキャッシュパス（mutable、永続）
     source_diff: picoruby/picoruby:trunk/diff         # DB の source カラム値（diff）
     source_article: picoruby/picoruby:trunk/article   # DB の source カラム値（article）
     prompt_supplement: "..."         # Claude CLI への追加プロンプト（任意）

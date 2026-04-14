@@ -3,7 +3,7 @@ sources:
     repo: picoruby/picoruby
     branch: master
     clone_url: https://github.com/picoruby/picoruby
-    repo_path: /tmp/trunk-changes-repos/picoruby
+    repo_path: ~/.cache/trunk-changes-repos/picoruby
     source_diff: picoruby/picoruby:trunk/diff
     source_article: picoruby/picoruby:trunk/article
     prompt_supplement: "PicoRubyはマイコン向けRuby実装です。mrbgemsはPicoRuby/mrubyのgemシステムです。サブモジュール更新はコア言語機能やランタイムへの影響を考察してください。"
@@ -12,7 +12,7 @@ sources:
     repo: ruby/ruby
     branch: master
     clone_url: https://github.com/ruby/ruby
-    repo_path: /tmp/trunk-changes-repos/ruby
+    repo_path: ~/.cache/trunk-changes-repos/ruby
     source_diff: ruby/ruby:trunk/diff
     source_article: ruby/ruby:trunk/article
 
@@ -20,7 +20,7 @@ sources:
     repo: mruby/mruby
     branch: master
     clone_url: https://github.com/mruby/mruby
-    repo_path: /tmp/trunk-changes-repos/mruby
+    repo_path: ~/.cache/trunk-changes-repos/mruby
     source_diff: mruby/mruby:trunk/diff
     source_article: mruby/mruby:trunk/article
 
