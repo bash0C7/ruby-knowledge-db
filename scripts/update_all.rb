@@ -13,7 +13,10 @@ require 'cruby_trunk_changes_generator'
 require 'mruby_trunk_changes_generator'
 require 'rurema_collector'
 require 'picoruby_docs_collector'
+require_relative '../lib/ruby_knowledge_db/config'
 require_relative '../lib/ruby_knowledge_db/orchestrator'
+
+RubyKnowledgeDb::Config.ensure_write_host!
 
 config   = YAML.load_file(File.join(__dir__, '../config/sources.yml'))
 db_path  = File.expand_path(config['db_path'], File.join(__dir__, '..'))

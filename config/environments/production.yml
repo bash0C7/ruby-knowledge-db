@@ -1,6 +1,11 @@
 db_path: db/ruby_knowledge.db
 db_copy_to: ~/Library/Mobile Documents/com~apple~CloudDocs/chiebukuro-mcp/db/ruby_knowledge.db
 
+# 書き込み系タスク（rake daily / update:* / scripts/update_all.rb）を実行してよいホスト名。
+# scutil --get LocalHostName の値と一致判定。ALLOW_WRITE=1 で一時バイパス可。
+# 暫定 workaround（README の「別 Mac 実行禁止」節を参照）。
+allowed_write_host: MacBook-Air-M3
+
 esa:
   team: bash-trunk-changes
   wip: false

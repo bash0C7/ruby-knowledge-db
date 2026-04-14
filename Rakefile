@@ -56,6 +56,7 @@ def save_last_run(data)
 end
 
 def build_store(cfg)
+  RubyKnowledgeDb::Config.ensure_write_host!
   db = File.expand_path(cfg['db_path'], __dir__)
   RubyKnowledgeStore::Migrator.new(db, migrations_dir: RubyKnowledgeStore::MIGRATIONS_DIR).run
   RubyKnowledgeStore::Store.new(db, embedder: RubyKnowledgeStore::Embedder.new)
@@ -179,6 +180,7 @@ namespace :esa do
     desc "Post #{key} changes from tmpdir to esa (DIR=path)"
     task key.to_sym do
       require_esa_deps
+      RubyKnowledgeDb::Config.ensure_write_host!
       dir = ENV['DIR'] or abort "DIR required (output of rake generate:#{key})"
 
       cfg      = RubyKnowledgeDb::Config.load
@@ -262,6 +264,7 @@ namespace :db do
   desc "Re-embed all memories with enriched embedding text (source prefix + truncation)"
   task :reembed do
     require_store_deps
+    RubyKnowledgeDb::Config.ensure_write_host!
 
     cfg = RubyKnowledgeDb::Config.load
     db_path = File.expand_path(cfg['db_path'], __dir__)
@@ -364,6 +367,7 @@ task :daily do
   require_generate_deps
   require_import_deps
   require_esa_deps
+  RubyKnowledgeDb::Config.ensure_write_host!
 
   since  = ENV['SINCE']  || (Date.today - 1).to_s
   before = ENV['BEFORE'] || Date.today.to_s

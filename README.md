@@ -81,6 +81,27 @@ sources:
 
 `*_trunk` で終わるキーから `generate:*`, `import:*`, `esa:*` の Rake タスクが自動生成される。
 
+## ⚠️ 別 Mac 実行禁止（暫定 workaround）
+
+`rake daily` / `rake update:*` / `rake import:*` / `rake esa:*` / `rake db:reembed` / `scripts/update_all.rb` などの**書き込み系タスクは特定の Mac（メイン機）でのみ実行**すること。別 Mac で動かすと以下の不整合を起こす:
+
+- production DB (`db/ruby_knowledge.db`) は git 管理外のローカル資産で、`rake daily` 末尾で iCloud (`db_copy_to`) に**片方向コピー**される（pull 同期なし）
+- esa token は macOS Keychain（`esa-mcp-token`）から取得するが、**iCloud Keychain では同期されない**汎用エントリなので Mac ごとに個別登録が必要
+- 別 Mac で古い/空の DB に書き込むと、iCloud 上の正しい DB を上書き破壊する
+
+そのため、本リポジトリは `config/environments/production.yml` の `allowed_write_host` と `scutil --get LocalHostName` の一致を、書き込み系タスクの開始時にチェックする**ホストガード**を持つ。
+
+```bash
+# 現ホストが allowed_write_host と異なると abort
+APP_ENV=production bundle exec rake daily
+# => Refusing to write: current host 'X' != allowed_write_host 'Y' ...
+
+# どうしても別 Mac で走らせる必要がある場合のみ（非推奨）
+ALLOW_WRITE=1 APP_ENV=production bundle exec rake daily
+```
+
+※ このガードはあくまで**暫定対処**。恒久的には「esa を source of truth にして DB を再生成可能にする」等の設計変更を検討中。`allowed_write_host` が未設定の環境（`development.yml` / `test.yml`）ではガードは無効。
+
 ## セットアップ
 
 ```bash
@@ -88,6 +109,30 @@ rbenv local 4.0.1
 bundle config set --local path 'vendor/bundle'
 bundle install
 ```
+
+### esa 書き込み用トークン登録（macOS Keychain）
+
+`rake daily` / `rake esa:*` は esa API へ記事を POST する。トークンは `security` コマンドで Keychain に登録する:
+
+```bash
+security add-generic-password -a "$USER" -s esa-mcp-token -w '<YOUR_ESA_TOKEN>'
+# 確認
+security find-generic-password -s esa-mcp-token -w
+```
+
+- team / category / wip は `config/environments/{APP_ENV}.yml` の `esa` セクションで制御
+- production は `bash-trunk-changes` team に `wip: false`、development / test は `bist` team に `wip: true`
+- **iCloud Keychain では同期されない**。Mac ごとに個別登録が必要（そもそも書き込みは単一 Mac 運用）
+
+### allowed_write_host 設定
+
+`config/environments/production.yml` に自分のメイン機の LocalHostName を設定する:
+
+```yaml
+allowed_write_host: MacBook-Air-M3   # scutil --get LocalHostName の値
+```
+
+現ホスト名は `scutil --get LocalHostName` で確認できる。
 
 ## 使い方
 
