@@ -219,6 +219,37 @@ submodule: `### (submodule名)[submodule GitHub URL] [変更内容タイトル](
 - **submodule 記事**: `git submodule update --init --depth=1` で clone。`submodule_changes` で SHA range 取得、`submodule_log` + `submodule_diff_stat` を Claude CLI に渡して個別記事生成
 - source: `picoruby/picoruby:trunk/article/{submodule_name}`
 
+### trunk-changes パイプラインの非決定論と監視
+
+Claude CLI の記事生成は**非決定論**（同じ入力で毎回違う出力）。これに起因する運用上の罠と決定論的対策:
+
+- **再実行で重複が積もる**: `rake daily` が途中失敗した後そのまま再実行すると、Claude CLI は違う文体で記事を再生成する → `content_hash` が一致せず DB 重複、esa 側も同名（`(1)` サフィックス）で二重投稿。対処: 事後に `rake db:scan_pollution` / `rake esa:find_duplicates` を必ず回す。
+- **generate フェーズの git stderr が exit 0 に埋もれる**: GitOps.setup や submodule update のエラーが silent failure になり、空データで記事生成 → 空メタ記事混入。trunk-changes-diary 5810d4c で submodule 側は on-demand fetch ガード済み。親リポ側は `rake cache:prepare`（`rake daily` の prereq）が fetch→reset→submodule 再帰を強制実行して事前検知。
+- **汚染 cleanup は ID 指定が安全**: `rake db:delete_polluted IDS=...` / `rake esa:delete IDS=...`。どちらも host guard 有効、IDS 未指定は abort。
+
+運用フロー（subagent 経由ではなく手動で回す場合）:
+
+```bash
+# pre-flight は rake daily に prereq 化済み（明示不要だが、トラブル時は単体実行可）
+APP_ENV=production bundle exec rake cache:prepare
+
+# 本番パイプライン
+APP_ENV=production SINCE=YYYY-MM-DD BEFORE=YYYY-MM-DD bundle exec rake daily
+
+# 事後検査
+APP_ENV=production bundle exec rake db:stats
+APP_ENV=production bundle exec rake db:scan_pollution
+APP_ENV=production bundle exec rake esa:find_duplicates DATE=YYYY-MM-DD
+
+# cleanup（必要時のみ、ID を明示）
+APP_ENV=production bundle exec rake db:delete_polluted IDS=1866,1869
+APP_ENV=production bundle exec rake esa:delete IDS=104
+```
+
+### キャッシュ方針
+
+`~/.cache/trunk-changes-repos/` に永続。`/tmp` は揮発なので使わない。mutable 前提 = working copy は常にクリーン / ローカルブランチは都度作り直し / submodule は recursive 再初期化、という不変条件を `cache:prepare` が強制する。物理破損（pack 崩れ等）は自動修復不可 → 手動で該当ディレクトリを削除して再 clone するのがエスケープハッチ。
+
 ### since 永続化
 `db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。
 `scripts/update_all.rb` が自動読み書き。ARGV[0] で手動上書き可能。

@@ -143,6 +143,14 @@ Only reached when the prompt contains `CONFIRMED` and explicit `SINCE`/`BEFORE`.
    - Any errors or non-zero exit
 4. If `rake daily` exits non-zero, report the failing phase and the tail of the error output. Do NOT attempt to retry or to "fix" source code. Investigation is the user's call.
 5. After success, run `bundle exec rake db:stats` and include its output so the user can see the updated DB state. (Do not use the `sqlite3` CLI — the project forbids it because the system binary lacks the vec0 extension.)
+6. **Post-run pollution scan — mandatory.** Claude CLI generates non-deterministic content (different per run), so retries after a failed `rake daily` can leak empty-meta articles or duplicates into DB/esa. After `db:stats`, run the deterministic scanners:
+   ```bash
+   APP_ENV=production bundle exec rake db:scan_pollution
+   APP_ENV=production bundle exec rake esa:find_duplicates
+   ```
+   Include both outputs verbatim in your final report. If either surfaces candidates, **do NOT delete them yourself** — report the suggested IDs and wait for the main session / user to invoke `rake db:delete_polluted IDS=...` or `rake esa:delete IDS=...` via a follow-up instruction. Deletions are destructive and require explicit consent.
+
+Note: `rake daily` itself now depends on `rake cache:prepare` as a prerequisite — the Rakefile fetches, hard-resets, and refreshes submodules for every `*_trunk` source before the pipeline starts, and aborts loud on any git error. You do not need to invoke `cache:prepare` separately; it runs automatically.
 
 ## Hard rules
 

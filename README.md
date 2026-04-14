@@ -173,6 +173,59 @@ APP_ENV=production SINCE=2026-04-10 BEFORE=2026-04-11 bundle exec rake daily
 
 全 `_trunk` ソース（picoruby/cruby/mruby）を順次 generate → import → esa 投稿。Store は共有して1回だけ開く。
 
+### 運用と監視（非決定論対策）
+
+trunk-changes パイプラインは Claude CLI で記事を生成するため**本質的に非決定論**で、失敗後の再実行や git キャッシュ破損によって DB / esa に汚染データが混入する可能性がある。以下の決定論的タスクで事前・事後に検出・修復する。
+
+#### cache:prepare（事前、`rake daily` に自動依存）
+
+```bash
+APP_ENV=production bundle exec rake cache:prepare
+```
+
+各 `*_trunk` source の `repo_path` に対して `git fetch origin <branch>` → `git checkout -f -B <branch> origin/<branch>` → `git submodule update --init --recursive --force` を強制実行。**どれか1つでも失敗したら即 abort**。前提: working copy は常にクリーン、ローカルブランチは都度作り直し、submodule は再帰再初期化。`rake daily` の prereq になっているので、通常は明示呼び出し不要。
+
+#### db:scan_pollution（事後、read-only）
+
+```bash
+APP_ENV=production bundle exec rake db:scan_pollution
+```
+
+既知の空メタマーカー（`空やん`, `書く材料がない`, `情報が渡されてへん`, `変更なし`, `出力フォーマット` 等）と `(source, 先頭200文字)` で重複候補を検出。ヒットしたレコードの ID 一覧を表示。
+
+#### db:delete_polluted（明示 ID 指定の破壊的削除）
+
+```bash
+APP_ENV=production bundle exec rake db:delete_polluted IDS=1866,1869,1871
+```
+
+`memories_vec` + `memories` を対象（`memories_fts` はトリガで自動追従）。`IDS` 必須、未指定は abort。host guard 有効。
+
+#### esa:find_duplicates（事後、read-only）
+
+```bash
+APP_ENV=production bundle exec rake esa:find_duplicates
+# 特定日のみ
+APP_ENV=production bundle exec rake esa:find_duplicates DATE=2026-04-12
+```
+
+`bash-trunk-changes` team 全体（または特定日）で、同一 category + 同一ベース名（` (1)` 等のサフィックス除去後）の重複投稿を検出。esa 側の書き込み齟齬・手動再投稿・retry での重複はここで見える。
+
+#### esa:delete（明示 ID 指定）
+
+```bash
+APP_ENV=production bundle exec rake esa:delete IDS=104,110
+```
+
+HTTP DELETE で esa 記事を削除。`IDS` 必須、host guard 有効。レート制限対策に各リクエスト間 2 秒 sleep。
+
+### ヒューリスティック注意事項
+
+- **`rake daily` の再実行は慎重に**: Claude CLI は同じ SINCE/BEFORE でも毎回違う文体・長さの記事を生成する。content_hash が一致せず、DB に重複レコードが積み上がる。失敗後の再実行前に `db:scan_pollution` / `esa:find_duplicates` で既存を確認、必要なら cleanup してから再走らせる。
+- **generate フェーズの git stderr は exit 0 に埋もれる**: 失敗しても Rake タスクは完走することがある。post-run の `scan_pollution` は必須と考えること。
+- **submodule shallow clone の空記事混入**は trunk-changes-diary 側で on-demand fetch ガードを入れて封じた（`trunk_changes.rb` の `ensure_submodule_sha`）。それでも取りこぼしの可能性はゼロではない — `scan_pollution` で最終判定する。
+- **キャッシュは `~/.cache/trunk-changes-repos/` に永続**。`/tmp` は揮発領域、使用禁止。`cache:prepare` が mutable 前提で動くので、手作業での `rm -rf` は原則不要（壊れたら reclone は手動判断）。
+
 ### APP_ENV
 
 | APP_ENV | DB | esa team | esa wip | esa category prefix |

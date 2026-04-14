@@ -101,6 +101,45 @@ def parse_md(path)
 end
 
 
+# ---- cache:prepare 共通ヘルパー ----
+# 前提: working tree は常にクリーン、ローカルブランチは都度 origin から作り直し。
+# 想定を満たすよう fetch → checkout -f -B → submodule recursive を実行し、
+# いずれかが失敗したら例外を投げて daily を止める。silent success 禁止。
+def sh_strict!(cmd, chdir: nil)
+  out, status = Dir.chdir(chdir || Dir.pwd) { [`#{cmd} 2>&1`, $?] }
+  unless status.success?
+    abort "cache:prepare failed\n  cmd: #{cmd}\n  cwd: #{chdir || Dir.pwd}\n  exit: #{status.exitstatus}\n  output:\n#{out}"
+  end
+  out
+end
+
+def prepare_trunk_cache(key, source_cfg)
+  repo_path = File.expand_path(source_cfg['repo_path'])
+  clone_url = source_cfg['clone_url']
+  branch    = source_cfg['branch']
+  FileUtils.mkdir_p(File.dirname(repo_path))
+
+  if !Dir.exist?(File.join(repo_path, '.git'))
+    puts "[#{key}] cloning #{clone_url} → #{repo_path}"
+    sh_strict!("git clone --no-single-branch #{clone_url} #{repo_path}")
+  else
+    # origin remote の URL を強制上書き（/tmp→~/.cache 移行後の健全性確保）
+    remotes = Dir.chdir(repo_path) { `git remote 2>/dev/null` }.split
+    if remotes.include?('origin')
+      sh_strict!("git remote set-url origin #{clone_url}", chdir: repo_path)
+    else
+      sh_strict!("git remote add origin #{clone_url}", chdir: repo_path)
+    end
+  end
+
+  puts "[#{key}] fetch origin #{branch}"
+  sh_strict!("git fetch --prune origin #{branch}", chdir: repo_path)
+  puts "[#{key}] checkout -f -B #{branch} origin/#{branch}"
+  sh_strict!("git checkout -f -B #{branch} origin/#{branch}", chdir: repo_path)
+  puts "[#{key}] submodule update --init --recursive --force"
+  sh_strict!("git submodule update --init --recursive --force", chdir: repo_path)
+end
+
 # ---- trunk-changes 共通ヘルパー ----
 def build_trunk_collector(source_cfg)
   repo_path = File.expand_path(source_cfg['repo_path'])
@@ -118,6 +157,20 @@ def build_trunk_collector(source_cfg)
     git_ops:           git,
     content_generator: gen
   )
+end
+
+# ---- cache:prepare: trunk-changes 系 repo キャッシュの事前健全化 ----
+namespace :cache do
+  desc "Prepare trunk-changes repo caches (fetch + checkout -f -B + submodule, fail hard on any error)"
+  task :prepare do
+    require_base
+    cfg = RubyKnowledgeDb::Config.load
+    cfg['sources'].each do |key, source_cfg|
+      next unless key.end_with?('_trunk')
+      prepare_trunk_cache(key, source_cfg)
+    end
+    puts "cache:prepare OK"
+  end
 end
 
 # ---- Phase 1: generate（動的タスク生成） ----
@@ -359,11 +412,196 @@ namespace :db do
 
     db.close
   end
+
+  # ---- db:scan_pollution: 空メタ記事・重複候補の検出（read-only）----
+  POLLUTION_MARKERS = [
+    '%空やん%', '%空ピョン%', '%書く材料がない%',
+    '%情報が渡されてへん%', '%情報が渡ってへん%',
+    '%事実無根%', '%出力フォーマット%'
+  ].freeze
+
+  desc "Scan memories for empty-meta / duplicate trunk/article pollution (read-only)"
+  task :scan_pollution do
+    require_base
+    require 'sqlite3'
+    require 'sqlite_vec'
+
+    cfg = RubyKnowledgeDb::Config.load
+    db_path = File.expand_path(cfg['db_path'], __dir__)
+    abort "DB not found: #{db_path}" unless File.exist?(db_path)
+
+    db = SQLite3::Database.new(db_path, readonly: true)
+    db.enable_load_extension(true); SqliteVec.load(db); db.enable_load_extension(false)
+    db.results_as_hash = true
+
+    meta_ids = []
+    puts "=== empty-meta markers ==="
+    POLLUTION_MARKERS.each do |m|
+      rows = db.execute(
+        "SELECT id, source, created_at, length(content) AS len, substr(content,1,120) AS head " \
+        "FROM memories WHERE source LIKE '%trunk/article%' AND content LIKE ? ORDER BY created_at", m
+      )
+      rows.each do |r|
+        meta_ids << r['id']
+        puts "  [#{m}] id=#{r['id']} src=#{r['source']} len=#{r['len']} created=#{r['created_at']}"
+        puts "    #{r['head'].gsub(/\s+/, ' ')}"
+      end
+    end
+    puts "  (none)" if meta_ids.empty?
+
+    puts ""
+    puts "=== duplicate candidates (same source + same first 200 chars) ==="
+    dup_rows = db.execute(
+      "SELECT source, substr(content, 1, 200) AS sig, COUNT(*) AS n, GROUP_CONCAT(id) AS ids " \
+      "FROM memories WHERE source LIKE '%trunk/article%' " \
+      "GROUP BY source, sig HAVING n > 1 ORDER BY n DESC"
+    )
+    if dup_rows.empty?
+      puts "  (none)"
+    else
+      dup_rows.each { |r| puts "  src=#{r['source']} count=#{r['n']} ids=#{r['ids']}" }
+    end
+
+    puts ""
+    puts "=== summary ==="
+    puts "  empty-meta ids: #{meta_ids.uniq.sort.join(',')}"
+    puts "  duplicate groups: #{dup_rows.size}"
+    puts "  次アクション: `APP_ENV=#{RubyKnowledgeDb::Config::APP_ENV} bundle exec rake db:delete_polluted IDS=#{meta_ids.uniq.sort.join(',')}`" unless meta_ids.empty?
+
+    db.close
+  end
+
+  # ---- db:delete_polluted IDS=1,2,3 — 明示 ID による破壊的削除 ----
+  desc "Delete memories by explicit IDS (IDS=1,2,3). Cleans memories_vec + memories (memories_fts auto via trigger)."
+  task :delete_polluted do
+    require_base
+    require 'sqlite3'
+    require 'sqlite_vec'
+    RubyKnowledgeDb::Config.ensure_write_host!
+
+    ids_raw = ENV['IDS'] or abort "IDS required (e.g., IDS=1866,1869)"
+    ids = ids_raw.split(',').map { |s| Integer(s.strip) }
+    abort "IDS empty" if ids.empty?
+
+    cfg = RubyKnowledgeDb::Config.load
+    db_path = File.expand_path(cfg['db_path'], __dir__)
+    abort "DB not found: #{db_path}" unless File.exist?(db_path)
+
+    db = SQLite3::Database.new(db_path)
+    db.enable_load_extension(true); SqliteVec.load(db); db.enable_load_extension(false)
+
+    before = db.get_first_value('SELECT count(*) FROM memories')
+    puts "before: memories=#{before}"
+    ids.each do |id|
+      db.execute('DELETE FROM memories_vec WHERE memory_id=?', id)
+      changes = db.changes
+      db.execute('DELETE FROM memories WHERE id=?', id)
+      puts "  deleted id=#{id} (memories_vec rows=#{changes}, memories rows=#{db.changes})"
+    end
+    after_m   = db.get_first_value('SELECT count(*) FROM memories')
+    after_v   = db.get_first_value('SELECT count(*) FROM memories_vec')
+    after_fts = db.get_first_value('SELECT count(*) FROM memories_fts')
+    puts "after:  memories=#{after_m} memories_vec=#{after_v} memories_fts=#{after_fts}"
+    if after_m == after_v && after_m == after_fts
+      puts "OK: all three tables aligned"
+    else
+      warn "WARN: table counts diverged — investigate"
+    end
+    db.close
+  end
+end
+
+# ---- esa:find_duplicates / esa:delete ----
+namespace :esa do
+  def esa_token
+    t = `/usr/bin/security find-generic-password -s 'esa-mcp-token' -w 2>/dev/null`.strip
+    abort "ESA token not found in keychain (key: esa-mcp-token)" if t.empty?
+    t
+  end
+
+  def esa_http_get(team, path)
+    require 'net/http'; require 'uri'; require 'json'
+    uri = URI("https://api.esa.io/v1/teams/#{team}#{path}")
+    http = Net::HTTP.new(uri.host, uri.port); http.use_ssl = true
+    req  = Net::HTTP::Get.new(uri.request_uri)
+    req['Authorization'] = "Bearer #{esa_token}"
+    JSON.parse(http.request(req).body)
+  end
+
+  desc "Find duplicate trunk-changes esa posts (optional DATE=YYYY-MM-DD filter)"
+  task :find_duplicates do
+    require_base
+    require 'net/http'; require 'uri'; require 'json'
+    cfg = RubyKnowledgeDb::Config.load
+    esa_cfg = cfg['esa'] or abort "esa config missing"
+    team = esa_cfg['team']
+    date_filter = ENV['DATE']
+
+    all_posts = []
+    page = 1
+    loop do
+      q = "category:production"
+      q += " name:#{date_filter}" if date_filter
+      body = esa_http_get(team, "/posts?q=#{URI.encode_www_form_component(q)}&per_page=100&page=#{page}")
+      all_posts.concat(body['posts'] || [])
+      break unless body['next_page']
+      page = body['next_page']
+    end
+    puts "=== scanned #{all_posts.size} posts on team=#{team} (DATE=#{date_filter || 'all'}) ==="
+
+    # Group by (category + base name with " (N)" suffix stripped)
+    groups = all_posts.group_by do |p|
+      base = p['name'].to_s.sub(/\s*\(\d+\)\s*$/, '')
+      [p['category'], base]
+    end
+    dups = groups.select { |_, posts| posts.size > 1 }
+
+    if dups.empty?
+      puts "  (no duplicates)"
+    else
+      dups.each do |(cat, base), posts|
+        puts "---- #{cat} / #{base} (#{posts.size} posts) ----"
+        posts.sort_by { |p| p['number'] }.each do |p|
+          head = p['body_md'].to_s[0, 80].gsub(/\s+/, ' ')
+          puts "  ##{p['number']} name='#{p['name']}' updated=#{p['updated_at']} len=#{p['body_md'].to_s.length} head=#{head}"
+        end
+      end
+      all_ids = dups.values.flatten.map { |p| p['number'] }
+      puts ""
+      puts "候補 ID 全列挙: #{all_ids.join(',')}"
+      puts "削除は: `APP_ENV=#{RubyKnowledgeDb::Config::APP_ENV} bundle exec rake esa:delete IDS=<残すものを除いた ID>`"
+    end
+  end
+
+  desc "Delete esa posts by explicit IDS (IDS=104,110). Hard delete via HTTP DELETE."
+  task :delete do
+    require_base
+    require 'net/http'; require 'uri'
+    RubyKnowledgeDb::Config.ensure_write_host!
+
+    ids_raw = ENV['IDS'] or abort "IDS required (e.g., IDS=104)"
+    ids = ids_raw.split(',').map { |s| Integer(s.strip) }
+    abort "IDS empty" if ids.empty?
+
+    cfg = RubyKnowledgeDb::Config.load
+    team = cfg.dig('esa', 'team') or abort "esa.team missing"
+
+    token = esa_token
+    ids.each do |id|
+      uri = URI("https://api.esa.io/v1/teams/#{team}/posts/#{id}")
+      http = Net::HTTP.new(uri.host, uri.port); http.use_ssl = true
+      req  = Net::HTTP::Delete.new(uri.request_uri)
+      req['Authorization'] = "Bearer #{token}"
+      res = http.request(req)
+      puts "DELETE ##{id}: #{res.code}"
+      sleep 2  # esa API rate limit
+    end
+  end
 end
 
 # ---- daily: 昨日分の全ソース一括処理 ----
 desc "Run daily pipeline: generate → import → esa for all trunk sources (SINCE/BEFORE auto-set to yesterday/today)"
-task :daily do
+task daily: :'cache:prepare' do
   require_generate_deps
   require_import_deps
   require_esa_deps
