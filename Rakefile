@@ -1,5 +1,6 @@
 require 'rake/testtask'
 require_relative 'lib/ruby_knowledge_db/config'
+require_relative 'lib/ruby_knowledge_db/trunk_bookmark'
 
 Rake::TestTask.new(:test) do |t|
   t.libs << 'test'
@@ -620,57 +621,81 @@ task daily: :'cache:prepare' do
     short_name = key.sub(/_trunk$/, '')
     puts "\n--- #{key} ---"
 
-    # Phase 1: generate
-    ENV['SINCE']  = since
-    ENV['BEFORE'] = before
-    collector = build_trunk_collector(source_cfg)
-    records   = collector.collect(since: since, before: before)
+    # Mark started (two-phase bookmark, Phase 1 of 2)
+    bm = RubyKnowledgeDb::TrunkBookmark.load(LAST_RUN_PATH)
+    RubyKnowledgeDb::TrunkBookmark.mark_started(bm, key, before: before)
+    RubyKnowledgeDb::TrunkBookmark.save(LAST_RUN_PATH, bm)
 
-    tmpdir = Dir.mktmpdir(["#{key}_", "_#{since}_#{before}"])
-    records.each { |r| write_md(tmpdir, r) }
-    puts "generate: #{records.size} records → #{tmpdir}"
+    source_ok = false
+    begin
+      # Phase 1: generate
+      ENV['SINCE']  = since
+      ENV['BEFORE'] = before
+      collector = build_trunk_collector(source_cfg)
+      records   = collector.collect(since: since, before: before)
 
-    next if records.empty?
+      tmpdir = Dir.mktmpdir(["#{key}_", "_#{since}_#{before}"])
+      records.each { |r| write_md(tmpdir, r) }
+      puts "generate: #{records.size} records → #{tmpdir}"
 
-    # Phase 2a: import to SQLite
-    files = Dir.glob(File.join(tmpdir, '*.md')).sort
-    stored = skipped = 0
-    files.each do |path|
-      rec = parse_md(path)
-      next unless rec
-      id = store.store(rec[:content], source: rec[:source])
-      id ? (stored += 1) : (skipped += 1)
-    end
-    puts "import: stored=#{stored}, skipped=#{skipped}"
+      any_esa_error = false
 
-    # Phase 2b: post to esa
-    next unless esa_cfg
-    category = esa_cfg.dig('sources', key, 'category')
-    next unless category
+      if records.any?
+        # Phase 2a: import to SQLite
+        files = Dir.glob(File.join(tmpdir, '*.md')).sort
+        stored = skipped = 0
+        files.each do |path|
+          rec = parse_md(path)
+          next unless rec
+          id = store.store(rec[:content], source: rec[:source])
+          id ? (stored += 1) : (skipped += 1)
+        end
+        puts "import: stored=#{stored}, skipped=#{skipped}"
 
-    article_files = Dir.glob(File.join(tmpdir, '*-article.md')).sort
-    posted = 0
-    article_files.each do |path|
-      rec = parse_md(path)
-      next unless rec
-      date = File.basename(path)[/\A(\d{4}-\d{2}-\d{2})/, 1]
-      next unless date
-      y, m, d = date.split('-')
-      date_category = "#{category}/#{y}/#{m}/#{d}"
-      title = "#{date}-#{short_name}-trunk-changes"
+        # Phase 2b: post to esa
+        if esa_cfg && (category = esa_cfg.dig('sources', key, 'category'))
+          article_files = Dir.glob(File.join(tmpdir, '*-article.md')).sort
+          posted = 0
+          article_files.each do |path|
+            rec = parse_md(path)
+            next unless rec
+            date = File.basename(path)[/\A(\d{4}-\d{2}-\d{2})/, 1]
+            next unless date
+            y, m, d = date.split('-')
+            date_category = "#{category}/#{y}/#{m}/#{d}"
+            title = "#{date}-#{short_name}-trunk-changes"
 
-      writer = RubyKnowledgeDb::EsaWriter.new(
-        team: esa_cfg['team'], category: date_category, wip: esa_cfg['wip']
-      )
-      res = writer.post(name: title, body_md: rec[:content])
-      if res['number']
-        puts "esa: ##{res['number']} #{res['full_name']}"
-        posted += 1
-      else
-        warn "ERROR posting #{path}: #{res.inspect}"
+            writer = RubyKnowledgeDb::EsaWriter.new(
+              team: esa_cfg['team'], category: date_category, wip: esa_cfg['wip']
+            )
+            res = writer.post(name: title, body_md: rec[:content])
+            if res['number']
+              puts "esa: ##{res['number']} #{res['full_name']}"
+              posted += 1
+            else
+              warn "ERROR posting #{path}: #{res.inspect}"
+              any_esa_error = true
+            end
+          end
+          puts "esa: posted=#{posted}"
+        end
       end
+
+      source_ok = !any_esa_error
+    rescue => e
+      warn "ERROR in #{key}: #{e.class}: #{e.message}"
+      source_ok = false
     end
-    puts "esa: posted=#{posted}"
+
+    # Mark completed only on full success (Phase 2 of 2)
+    if source_ok
+      bm = RubyKnowledgeDb::TrunkBookmark.load(LAST_RUN_PATH)
+      RubyKnowledgeDb::TrunkBookmark.mark_completed(bm, key, before: before)
+      RubyKnowledgeDb::TrunkBookmark.save(LAST_RUN_PATH, bm)
+      puts "bookmark: #{key} completed before=#{before}"
+    else
+      warn "bookmark: #{key} NOT marked completed (errors or exception) — next run will re-process"
+    end
   end
 
   store.close
