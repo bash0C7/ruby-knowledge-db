@@ -254,7 +254,17 @@ APP_ENV=production bundle exec rake esa:delete IDS=104
 `db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。
 `scripts/update_all.rb` が自動読み書き。ARGV[0] で手動上書き可能。
 
-**注意:** `rake daily`（trunk-changes 3フェーズパイプライン）は `last_run.yml` を**読まへんし書かへん**。trunk-changes 系の次回 SINCE は esa 側の最新投稿日（`bash-trunk-changes` team の `production/{picoruby,cruby,mruby}/trunk-changes/YYYY/MM/DD/...` パス）を事実上の bookmark として判断する。`last_run.yml` は `scripts/update_all.rb` と rurema / picoruby_docs 系 collector 専用。
+**更新:** `rake daily`（trunk-changes 3フェーズパイプライン）は **二段コミット式 bookmark** を `last_run.yml` に書き込む。各 `*_trunk` ソースごとに Phase 1 開始直前に `last_started_{at,before}` を記録し、Phase 2b（esa 投稿）がエラーなく完走した時だけ `last_completed_{at,before}` を追記する。`last_started_before > last_completed_before`（あるいは `last_completed_*` 欠落）のソースは WIP = 前回実行が完走してへん、というシグナル。次回の SINCE は `min(last_completed_before)` を床にして safe floor から再開（`content_hash` 冪等で重複は自動スキップ）。`rurema` / `picoruby_docs` 系は従来通り flat string（`scripts/update_all.rb` と `namespace :update` が管理）。
+
+二段コミット bookmark のスキーマ例:
+
+```yaml
+picoruby_trunk:
+  last_started_at:       2026-04-15T10:00:00+09:00
+  last_started_before:   2026-04-15
+  last_completed_at:     2026-04-15T10:05:00+09:00
+  last_completed_before: 2026-04-15
+```
 
 ### MD ファイル import（picoruby trunk）
 ```bash
