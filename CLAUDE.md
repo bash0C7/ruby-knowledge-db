@@ -305,6 +305,7 @@ embedding.pack("f*")   # float 配列 → blob
 | `../rurema-collector/` | rurema doctree RD パース（BitClust::RRDParser）|
 | `../picoruby-docs-collector/` | PicoRuby RBS + README 収集 |
 | `lib/ruby_knowledge_db/orchestrator.rb` | 全ソース一括更新オーケストレーション |
+| `lib/ruby_knowledge_db/trunk_bookmark.rb` | `rake daily` の二段 bookmark 管理（load/save/mark_started/mark_completed/status/recommended_since_floor）|
 | `lib/ruby_knowledge_db/esa_writer.rb` | esa API 投稿 |
 | `lib/ruby_knowledge_db/config.rb` | APP_ENV 別設定ロード |
 | `../ruby-knowledge-store/migrations/001_schema.sql` | memories + FTS5 + vec0 + _sqlite_mcp_meta |
