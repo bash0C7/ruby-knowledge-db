@@ -84,4 +84,72 @@ class TestTrunkBookmark < Test::Unit::TestCase
     assert_equal '2026-04-15', data['picoruby_trunk']['last_completed_before']
     assert_nil              data['picoruby_trunk']['last_started_before']
   end
+
+  def test_status_empty_data_returns_nil_bookmarks
+    status = RubyKnowledgeDb::TrunkBookmark.status({}, %w[picoruby_trunk cruby_trunk])
+    assert_equal(%w[picoruby_trunk cruby_trunk], status.keys)
+    status.each_value do |s|
+      assert_nil s[:last_started_before]
+      assert_nil s[:last_completed_before]
+      assert_false s[:wip]
+    end
+  end
+
+  def test_status_clean_source_reports_not_wip
+    data = {
+      'picoruby_trunk' => {
+        'last_started_at'       => '2026-04-15T10:00:00+09:00',
+        'last_started_before'   => '2026-04-15',
+        'last_completed_at'     => '2026-04-15T10:05:00+09:00',
+        'last_completed_before' => '2026-04-15'
+      }
+    }
+    status = RubyKnowledgeDb::TrunkBookmark.status(data, %w[picoruby_trunk])
+    assert_false status['picoruby_trunk'][:wip]
+    assert_equal '2026-04-15', status['picoruby_trunk'][:recommended_since]
+  end
+
+  def test_status_detects_wip_when_started_newer_than_completed
+    data = {
+      'picoruby_trunk' => {
+        'last_started_before'   => '2026-04-15',
+        'last_completed_before' => '2026-04-14'
+      }
+    }
+    status = RubyKnowledgeDb::TrunkBookmark.status(data, %w[picoruby_trunk])
+    assert_true  status['picoruby_trunk'][:wip]
+    assert_equal '2026-04-14', status['picoruby_trunk'][:recommended_since]
+  end
+
+  def test_status_detects_wip_when_completed_missing
+    data = {
+      'picoruby_trunk' => { 'last_started_before' => '2026-04-15' }
+    }
+    status = RubyKnowledgeDb::TrunkBookmark.status(data, %w[picoruby_trunk])
+    assert_true status['picoruby_trunk'][:wip]
+    assert_nil  status['picoruby_trunk'][:recommended_since]
+  end
+
+  def test_recommended_since_floor_returns_min_completed_before
+    data = {
+      'picoruby_trunk' => { 'last_completed_before' => '2026-04-14' },
+      'cruby_trunk'    => { 'last_completed_before' => '2026-04-10' },
+      'mruby_trunk'    => { 'last_completed_before' => '2026-04-12' }
+    }
+    floor = RubyKnowledgeDb::TrunkBookmark.recommended_since_floor(
+      data, %w[picoruby_trunk cruby_trunk mruby_trunk]
+    )
+    assert_equal '2026-04-10', floor
+  end
+
+  def test_recommended_since_floor_returns_nil_when_any_source_has_no_completed
+    data = {
+      'picoruby_trunk' => { 'last_completed_before' => '2026-04-14' },
+      'cruby_trunk'    => { 'last_started_before'   => '2026-04-10' }  # never completed
+    }
+    floor = RubyKnowledgeDb::TrunkBookmark.recommended_since_floor(
+      data, %w[picoruby_trunk cruby_trunk]
+    )
+    assert_nil floor
+  end
 end

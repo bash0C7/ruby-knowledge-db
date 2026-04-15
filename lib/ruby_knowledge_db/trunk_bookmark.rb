@@ -33,5 +33,36 @@ module RubyKnowledgeDb
       data[source_key] = entry
       data
     end
+
+    # @return [Hash{String => Hash}] keyed by source_key, each with
+    #   :last_started_at, :last_started_before, :last_completed_at,
+    #   :last_completed_before, :wip, :recommended_since
+    def status(data, source_keys)
+      source_keys.each_with_object({}) do |key, acc|
+        entry     = data[key].is_a?(Hash) ? data[key] : {}
+        started   = entry['last_started_before']
+        completed = entry['last_completed_before']
+        wip = !started.nil? && (completed.nil? || started > completed)
+        acc[key] = {
+          last_started_at:       entry['last_started_at'],
+          last_started_before:   started,
+          last_completed_at:     entry['last_completed_at'],
+          last_completed_before: completed,
+          wip:                   wip,
+          recommended_since:     completed
+        }
+      end
+    end
+
+    # Returns the safest SINCE floor across all sources: min of last_completed_before.
+    # Returns nil if any source has no last_completed_before (caller must decide fallback).
+    def recommended_since_floor(data, source_keys)
+      completed = source_keys.map do |key|
+        entry = data[key].is_a?(Hash) ? data[key] : {}
+        entry['last_completed_before']
+      end
+      return nil if completed.any?(&:nil?)
+      completed.min
+    end
   end
 end
