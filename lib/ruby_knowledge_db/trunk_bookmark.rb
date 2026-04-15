@@ -34,9 +34,11 @@ module RubyKnowledgeDb
       data
     end
 
+    # Returns per-source bookmark snapshot (nil-safe). For a single SINCE floor
+    # across all sources, use `recommended_since_floor` instead.
     # @return [Hash{String => Hash}] keyed by source_key, each with
     #   :last_started_at, :last_started_before, :last_completed_at,
-    #   :last_completed_before, :wip, :recommended_since
+    #   :last_completed_before, :wip, :recommended_since (per-source completed_before)
     def status(data, source_keys)
       source_keys.each_with_object({}) do |key, acc|
         entry     = data[key].is_a?(Hash) ? data[key] : {}
@@ -56,6 +58,7 @@ module RubyKnowledgeDb
 
     # Returns the safest SINCE floor across all sources: min of last_completed_before.
     # Returns nil if any source has no last_completed_before (caller must decide fallback).
+    # For per-source detail (WIP flag etc), use `status` instead.
     def recommended_since_floor(data, source_keys)
       completed = source_keys.map do |key|
         entry = data[key].is_a?(Hash) ? data[key] : {}
