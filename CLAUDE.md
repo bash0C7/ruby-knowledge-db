@@ -31,7 +31,7 @@ Ruby エコシステム（PicoRuby / CRuby / mruby / rurema）のナレッジを
   │   └── import_esa_export.rb   esa エクスポート一括 import
   └── db/
       ├── ruby_knowledge.db  本番 DB（git 管理外）
-      └── last_run.yml       since 永続化（コレクタークラス名 → 最終実行時刻）
+      └── last_run.yml       since 永続化（docs は コレクタークラス名 → 最終実行時刻、trunk は sources.yml キー → 二段 bookmark Hash）
 ```
 
 ---
@@ -58,7 +58,7 @@ module RuremaCollector  # または PicorubyDocsCollector, etc.
 end
 ```
 
-last_run.yml のキーは完全修飾クラス名（例: `RuremaCollector::Collector`, `PicorubyDocsCollector::Collector`）。
+last_run.yml のキー: docs 系コレクターは完全修飾クラス名（例: `RuremaCollector::Collector`, `PicorubyDocsCollector::Collector`）。trunk 系は `sources.yml` のキー（`picoruby_trunk` / `cruby_trunk` / `mruby_trunk`）で、値は `last_started_{at,before}` / `last_completed_{at,before}` の 4 フィールド Hash。
 
 ---
 
@@ -223,7 +223,7 @@ submodule: `### (submodule名)[submodule GitHub URL] [変更内容タイトル](
 
 Claude CLI の記事生成は**非決定論**（同じ入力で毎回違う出力）。これに起因する運用上の罠と決定論的対策:
 
-- **再実行で重複が積もる**: `rake daily` が途中失敗した後そのまま再実行すると、Claude CLI は違う文体で記事を再生成する → `content_hash` が一致せず DB 重複、esa 側も同名（`(1)` サフィックス）で二重投稿。対処: 事後に `rake db:scan_pollution` / `rake esa:find_duplicates` を必ず回す。
+- **再実行で重複が積もる**: `rake daily` が途中失敗した後そのまま再実行すると、Claude CLI は違う文体で記事を再生成する → `content_hash` が一致せず DB 重複、esa 側も同名（`(1)` サフィックス）で二重投稿。対処: 事後に `rake db:scan_pollution` / `rake esa:find_duplicates` を必ず回す。なお `rake daily` は partial 失敗時に `last_completed_*` を書かへんため subagent PLAN で `wip=true` が立つ — 次の再実行で自動的に同じ SINCE から拾い直すが、**既に投稿済みの esa 記事は `(1)` 重複になる**ので、WIP 検出を見たら必ず `esa:find_duplicates` で該当日を確認する。
 - **generate フェーズの git stderr が exit 0 に埋もれる**: GitOps.setup や submodule update のエラーが silent failure になり、空データで記事生成 → 空メタ記事混入。trunk-changes-diary 5810d4c で submodule 側は on-demand fetch ガード済み。親リポ側は `rake cache:prepare`（`rake daily` の prereq）が fetch→reset→submodule 再帰を強制実行して事前検知。
 - **汚染 cleanup は ID 指定が安全**: `rake db:delete_polluted IDS=...` / `rake esa:delete IDS=...`。どちらも host guard 有効、IDS 未指定は abort。
 

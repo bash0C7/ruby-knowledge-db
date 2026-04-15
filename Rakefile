@@ -636,53 +636,60 @@ task daily: :'cache:prepare' do
         records   = collector.collect(since: since, before: before)
 
         tmpdir = Dir.mktmpdir(["#{key}_", "_#{since}_#{before}"])
-        records.each { |r| write_md(tmpdir, r) }
-        puts "generate: #{records.size} records → #{tmpdir}"
+        begin
+          records.each { |r| write_md(tmpdir, r) }
+          puts "generate: #{records.size} records → #{tmpdir}"
 
-        any_esa_error = false
+          any_esa_error = false
 
-        if records.any?
-          # Phase 2a: import to SQLite
-          files = Dir.glob(File.join(tmpdir, '*.md')).sort
-          stored = skipped = 0
-          files.each do |path|
-            rec = parse_md(path)
-            next unless rec
-            id = store.store(rec[:content], source: rec[:source])
-            id ? (stored += 1) : (skipped += 1)
-          end
-          puts "import: stored=#{stored}, skipped=#{skipped}"
-
-          # Phase 2b: post to esa
-          if esa_cfg && (category = esa_cfg.dig('sources', key, 'category'))
-            article_files = Dir.glob(File.join(tmpdir, '*-article.md')).sort
-            posted = 0
-            article_files.each do |path|
+          if records.any?
+            # Phase 2a: import to SQLite
+            files = Dir.glob(File.join(tmpdir, '*.md')).sort
+            stored = skipped = 0
+            files.each do |path|
               rec = parse_md(path)
               next unless rec
-              date = File.basename(path)[/\A(\d{4}-\d{2}-\d{2})/, 1]
-              next unless date
-              y, m, d = date.split('-')
-              date_category = "#{category}/#{y}/#{m}/#{d}"
-              title = "#{date}-#{short_name}-trunk-changes"
-
-              writer = RubyKnowledgeDb::EsaWriter.new(
-                team: esa_cfg['team'], category: date_category, wip: esa_cfg['wip']
-              )
-              res = writer.post(name: title, body_md: rec[:content])
-              if res['number']
-                puts "esa: ##{res['number']} #{res['full_name']}"
-                posted += 1
-              else
-                warn "ERROR posting #{path}: #{res.inspect}"
-                any_esa_error = true
-              end
+              id = store.store(rec[:content], source: rec[:source])
+              id ? (stored += 1) : (skipped += 1)
             end
-            puts "esa: posted=#{posted}"
-          end
-        end
+            puts "import: stored=#{stored}, skipped=#{skipped}"
 
-        source_ok = !any_esa_error
+            # Phase 2b: post to esa
+            if esa_cfg && (category = esa_cfg.dig('sources', key, 'category'))
+              article_files = Dir.glob(File.join(tmpdir, '*-article.md')).sort
+              posted = 0
+              article_files.each do |path|
+                rec = parse_md(path)
+                next unless rec
+                date = File.basename(path)[/\A(\d{4}-\d{2}-\d{2})/, 1]
+                next unless date
+                y, m, d = date.split('-')
+                date_category = "#{category}/#{y}/#{m}/#{d}"
+                title = "#{date}-#{short_name}-trunk-changes"
+
+                writer = RubyKnowledgeDb::EsaWriter.new(
+                  team: esa_cfg['team'], category: date_category, wip: esa_cfg['wip']
+                )
+                res = writer.post(name: title, body_md: rec[:content])
+                if res['number']
+                  puts "esa: ##{res['number']} #{res['full_name']}"
+                  posted += 1
+                else
+                  warn "ERROR posting #{path}: #{res.inspect}"
+                  any_esa_error = true
+                end
+              end
+              puts "esa: posted=#{posted}"
+            else
+              warn "WARN #{key}: esa category not configured — articles not posted"
+              any_esa_error = true
+            end
+          end
+
+          source_ok = !any_esa_error
+        ensure
+          FileUtils.rm_rf(tmpdir)
+        end
       rescue => e
         warn "ERROR in #{key}: #{e.class}: #{e.message}"
         source_ok = false
