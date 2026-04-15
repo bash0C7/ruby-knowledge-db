@@ -37,40 +37,55 @@ Your job: compute the intended date range and report it. Nothing else.
 
 The timezone is JST (Asia/Tokyo). The project's date semantics are JST-based.
 
-### SINCE default — read from `db/last_run.yml`
+### SINCE default — read from `db/last_run.yml` (two-phase bookmark)
 
-The default `SINCE` comes from `db/last_run.yml`, **not** from "yesterday". This file records the last successfully processed `before` timestamp per collector class. For daily-runner, we care about the trunk collectors.
+The default `SINCE` comes from `db/last_run.yml`. `rake daily` writes per-source bookmarks there in a two-phase shape:
 
-Note: `rake daily` itself does not write to `last_run.yml` (only `scripts/update_all.rb` and `namespace :update` do). The file nonetheless represents the best available "how far have we ingested" bookmark for trunk sources, so use it as the SINCE floor. The user explicitly wants this behavior — do not substitute "yesterday" for it.
+```yaml
+picoruby_trunk:
+  last_started_at:       2026-04-15T10:00:00+09:00
+  last_started_before:   2026-04-15
+  last_completed_at:     2026-04-15T10:05:00+09:00
+  last_completed_before: 2026-04-15
+cruby_trunk:
+  ...
+mruby_trunk:
+  ...
+```
 
-Use a small Ruby one-liner via `bundle exec ruby` (stay consistent with the project's "Ruby only, always via bundle exec" rule) to read the file and pick the earliest trunk entry. Reading the earliest (not the latest) across all trunk keys guarantees no collector is skipped when a future source (e.g. `CrubyTrunk::Collector`) gets added with an older bookmark:
+`last_started_*` is written before Phase 1 of each source; `last_completed_*` is only written after Phase 2b (esa post) succeeds with zero errors. A source whose `last_started_before > last_completed_before` (or whose `last_completed_*` is missing entirely) is **WIP** — its last run did not complete.
+
+Recommended `SINCE` = min of `last_completed_before` across the trunk sources read from `config/sources.yml`. Using the minimum is the safest floor: it guarantees no source is skipped, and `content_hash` dedup in the Store makes re-processing harmless at the DB layer.
+
+Read the file with a small Ruby one-liner (stay consistent with the project's "Ruby only, always via bundle exec" rule):
 
 ```bash
 cd /Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db && \
-  bundle exec ruby -ryaml -rdate -e '
-    path = "db/last_run.yml"
-    data = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
-    trunk = data.select { |k, _| k.to_s.include?("Trunk") }
-    if trunk.empty?
-      puts "NO_TRUNK_ENTRY"
-    else
-      # pick earliest bookmark across all trunk collectors
-      min_key, min_val = trunk.min_by { |_, v| v.to_s }
-      # normalise to YYYY-MM-DD (strip time portion if ISO8601)
-      date = min_val.to_s[0, 10]
-      puts "#{min_key}\t#{min_val}\t#{date}"
+  bundle exec ruby -ryaml -e '
+    require_relative "lib/ruby_knowledge_db/trunk_bookmark"
+    require "yaml"
+    cfg  = YAML.load_file("config/sources.yml") || {}
+    keys = (cfg["sources"] || {}).keys.select { |k| k.to_s.end_with?("_trunk") }
+    data = RubyKnowledgeDb::TrunkBookmark.load("db/last_run.yml")
+    status = RubyKnowledgeDb::TrunkBookmark.status(data, keys)
+    floor  = RubyKnowledgeDb::TrunkBookmark.recommended_since_floor(data, keys)
+    puts "TRUNK_KEYS=#{keys.join(",")}"
+    status.each do |k, s|
+      puts "STATUS\t#{k}\tstarted=#{s[:last_started_before].inspect}\tcompleted=#{s[:last_completed_before].inspect}\twip=#{s[:wip]}"
     end
+    puts "FLOOR=#{floor.inspect}"
   '
 ```
 
 Interpret the result:
 
-- **Happy path** — you get `<key>\t<raw>\t<YYYY-MM-DD>`. Use the `YYYY-MM-DD` as `SINCE`. Record both the raw value and the picked key in your report so the user sees which bookmark you used.
-- **`NO_TRUNK_ENTRY`** — no trunk bookmark exists yet. Fall back to yesterday (JST) and **flag this clearly** in the report so the user knows it's a fallback, not the normal path.
+- **Happy path** — all sources have non-nil `last_completed_before`, `FLOOR` is a `YYYY-MM-DD`. Use it as `SINCE`.
+- **WIP detected** — one or more sources have `wip=true`. Still use `FLOOR` as SINCE (will replay from the last fully-completed floor), but **surface the WIP sources explicitly** in the report so the user knows a prior run did not finish cleanly.
+- **No completion history at all** — `FLOOR=nil`. Fall back to yesterday (JST) and flag this as a first-run / bootstrap condition in the report.
 
 Override rules:
 - If the prompt gave explicit `SINCE`, use that verbatim and note "explicit override — last_run.yml ignored".
-- Otherwise always prefer the last_run.yml value.
+- Otherwise always prefer the `FLOOR` value.
 
 ### BEFORE default
 
@@ -99,21 +114,36 @@ Report back in this exact structure (Japanese is fine, but keep the labeled fiel
 ```
 ## daily-runner PLAN
 - APP_ENV: production
-- SINCE:   2026-04-02         ← from last_run.yml
-- SINCE source: PicorubyTrunk::Collector = '2026-04-02T18:48:20+09:00'
-- BEFORE:  2026-04-12          ← today (JST)
+- SINCE:   2026-04-14         ← FLOOR = min of last_completed_before
+- BEFORE:  2026-04-15          ← today (JST)
 - 半開区間: [SINCE, BEFORE)
 - DB:      db/ruby_knowledge.db (XX bytes, mtime ...)
+- 対象ソース: picoruby_trunk / cruby_trunk / mruby_trunk
+
+### Per-source bookmark status
+- picoruby_trunk: started=2026-04-14  completed=2026-04-14  (OK)
+- cruby_trunk:    started=2026-04-14  completed=2026-04-14  (OK)
+- mruby_trunk:    started=2026-04-14  completed=2026-04-14  (OK)
+
+### WIP detected
+(none)   ← or per-source list if any wip=true
+
 - 実行予定コマンド:
-  APP_ENV=production SINCE=2026-04-02 BEFORE=2026-04-12 bundle exec rake daily
-- 対象ソース: config/sources.yml の全 *_trunk キー（picoruby_trunk / cruby_trunk / mruby_trunk 等）
+  APP_ENV=production SINCE=2026-04-14 BEFORE=2026-04-15 bundle exec rake daily
 - 次のアクション: ユーザーに上記範囲で良いか確認し、OK なら
-  `CONFIRMED SINCE=2026-04-02 BEFORE=2026-04-12` を含むプロンプトで再度このエージェントを呼び出してください。
+  `CONFIRMED SINCE=2026-04-14 BEFORE=2026-04-15` を含むプロンプトで再度このエージェントを呼び出してください。
 ```
 
-If the fallback path kicked in, surface it explicitly:
+If WIP is detected, list the offenders explicitly:
 ```
-- SINCE:   2026-04-11         ← FALLBACK: last_run.yml に Trunk 系エントリなし、昨日を使用
+### WIP detected
+- picoruby_trunk: started=2026-04-15 completed=2026-04-14  ⚠ 前回 started やのに completed 未記録
+  → SINCE=2026-04-14 で再実行すれば content_hash 冪等で安全に拾い直せます
+```
+
+If `FLOOR=nil` (no completion history), surface the bootstrap fallback:
+```
+- SINCE:   2026-04-14         ← FALLBACK: last_run.yml に completed 履歴なし、昨日を使用
 ```
 
 **Do NOT run `bundle exec rake daily` in PLAN mode.** Do not run `generate:*`, `import:*`, or `esa:*` either. Your only outputs in PLAN mode are the date computation commands and the report.
