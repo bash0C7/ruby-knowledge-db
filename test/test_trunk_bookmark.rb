@@ -60,4 +60,28 @@ class TestTrunkBookmark < Test::Unit::TestCase
     data = RubyKnowledgeDb::TrunkBookmark.mark_started(data, 'picoruby_trunk', before: '2026-04-15', at: Time.now)
     assert_equal '2026-04-14', data['cruby_trunk']['last_started_before']
   end
+
+  def test_mark_completed_on_fresh_started_entry
+    now = Time.new(2026, 4, 15, 10, 5, 0, '+09:00')
+    data = {
+      'picoruby_trunk' => {
+        'last_started_at'     => '2026-04-15T10:00:00+09:00',
+        'last_started_before' => '2026-04-15'
+      }
+    }
+    data = RubyKnowledgeDb::TrunkBookmark.mark_completed(data, 'picoruby_trunk', before: '2026-04-15', at: now)
+    assert_equal '2026-04-15T10:05:00+09:00', data['picoruby_trunk']['last_completed_at']
+    assert_equal '2026-04-15',                data['picoruby_trunk']['last_completed_before']
+    # started fields preserved as evidence
+    assert_equal '2026-04-15T10:00:00+09:00', data['picoruby_trunk']['last_started_at']
+    assert_equal '2026-04-15',                data['picoruby_trunk']['last_started_before']
+  end
+
+  def test_mark_completed_when_started_missing_still_writes
+    # defensive: even without a preceding started, accept the completion write
+    now = Time.new(2026, 4, 15, 10, 5, 0, '+09:00')
+    data = RubyKnowledgeDb::TrunkBookmark.mark_completed({}, 'picoruby_trunk', before: '2026-04-15', at: now)
+    assert_equal '2026-04-15', data['picoruby_trunk']['last_completed_before']
+    assert_nil              data['picoruby_trunk']['last_started_before']
+  end
 end

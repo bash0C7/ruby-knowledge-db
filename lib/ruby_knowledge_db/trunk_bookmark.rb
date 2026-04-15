@@ -25,5 +25,13 @@ module RubyKnowledgeDb
       data[source_key] = entry
       data
     end
+
+    def mark_completed(data, source_key, before:, at: Time.now)
+      entry = data[source_key].is_a?(Hash) ? data[source_key].dup : {}
+      entry['last_completed_at']     = at.iso8601
+      entry['last_completed_before'] = before.to_s
+      data[source_key] = entry
+      data
+    end
   end
 end
