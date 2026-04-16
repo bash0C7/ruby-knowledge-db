@@ -43,6 +43,7 @@ def require_update_deps
   require_store_deps
   require 'rurema_collector'
   require 'picoruby_docs_collector'
+  require 'ruby_rdoc_collector'
 end
 
 LAST_RUN_PATH = File.expand_path('db/last_run.yml', __dir__)
@@ -310,6 +311,11 @@ namespace :update do
   desc "Update picoruby docs (SINCE=yyyy-mm-dd BEFORE=yyyy-mm-dd)"
   task :picoruby_docs do
     run_collector(:picoruby_docs, 'PicorubyDocsCollector::Collector', 'picoruby_docs')
+  end
+
+  desc "Update ruby rdoc (downloads tarball, translates, stores). No cache:prepare needed."
+  task :ruby_rdoc do
+    run_collector(:ruby_rdoc, 'RubyRdocCollector::Collector', 'ruby_rdoc')
   end
 end
 
