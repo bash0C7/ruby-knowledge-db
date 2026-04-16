@@ -91,6 +91,7 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 | `rurema/doctree:ruby4.0/{lib}` | るりま Ruby 4.0 ライブラリドキュメント |
 | `rurema/doctree:ruby4.0/{lib}#{class}` | るりま Ruby 4.0 クラスドキュメント |
 | `picoruby/picoruby:docs/{gem}` | PicoRuby gem RBS + README |
+| `ruby/ruby:rdoc/trunk/{ClassName}` | ruby/ruby trunk RDoc の日本語翻訳版（ruby-rdoc-collector）|
 
 ---
 
@@ -103,6 +104,7 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 | trunk-changes-diary   | `../trunk-changes-diary`   | Git diff 取得・Claude CLI 記事生成エンジン |
 | rurema-collector      | `../rurema-collector`      | rurema/doctree 収集（内部で rurema/doctree を clone/参照）|
 | picoruby-docs-collector | `../picoruby-docs-collector` | picoruby/picoruby の docs（RBS + README）収集 |
+| ruby-rdoc-collector   | `../ruby-rdoc-collector`   | ruby/ruby の RDoc HTML（cache.ruby-lang.org tarball）を取得し Claude CLI haiku で日本語翻訳 |
 | chiebukuro-mcp        | `../chiebukuro-mcp`        | MCP サーバー（`exe/chiebukuro-mcp serve` を委譲先として使用）|
 | ruby-knowledge-store  | `../ruby-knowledge-store`  | Store / Embedder / Migrator |
 
@@ -249,6 +251,8 @@ APP_ENV=production bundle exec rake esa:delete IDS=104
 ### キャッシュ方針
 
 `~/.cache/trunk-changes-repos/` に永続。`/tmp` は揮発なので使わない。mutable 前提 = working copy は常にクリーン / ローカルブランチは都度作り直し / submodule は recursive 再初期化、という不変条件を `cache:prepare` が強制する。物理破損（pack 崩れ等）は自動修復不可 → 手動で該当ディレクトリを削除して再 clone するのがエスケープハッチ。
+
+`ruby-rdoc-collector` は `https://cache.ruby-lang.org/pub/ruby/doc/ruby-docs-en-master.tar.xz` を `~/.cache/ruby-rdoc-collector/tarball/` にダウンロード・展開する。ruby/ruby clone は不要（`cache:prepare` 依存なし）。翻訳キャッシュは `~/.cache/ruby-rdoc-collector/translations/` に SHA256 キー（`v2|haiku|<text>` フォーマット）で保存。Translator は `claude --model haiku -p -` を `chdir: '/tmp'` で起動し `~/CLAUDE.md` の persona 漏洩を防ぐ。smoke test 用エスケープハッチとして `RUBY_RDOC_TARGETS=ClassA,ClassB` / `RUBY_RDOC_MAX_METHODS=20` env var を Collector が認識する（default は無制限）。
 
 ### since 永続化
 `db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。
