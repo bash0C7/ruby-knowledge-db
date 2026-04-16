@@ -13,6 +13,7 @@ require 'cruby_trunk_changes_generator'
 require 'mruby_trunk_changes_generator'
 require 'rurema_collector'
 require 'picoruby_docs_collector'
+require 'ruby_rdoc_collector'
 require_relative '../lib/ruby_knowledge_db/config'
 require_relative '../lib/ruby_knowledge_db/orchestrator'
 
@@ -34,6 +35,7 @@ collectors = [
   srcs['mruby_trunk']    && MrubyTrunkChangesGenerator::Collector.new(srcs['mruby_trunk']),
   srcs['rurema']         && RuremaCollector::Collector.new(srcs['rurema']),
   srcs['picoruby_docs']  && PicorubyDocsCollector::Collector.new(srcs['picoruby_docs']),
+  srcs['ruby_rdoc']      && RubyRdocCollector::Collector.new(srcs['ruby_rdoc']),
 ].compact
 
 last_run_path = File.expand_path('../db/last_run.yml', __dir__)
