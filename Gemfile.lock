@@ -14,6 +14,7 @@ PATH
   remote: ../chiebukuro-mcp
   specs:
     chiebukuro_mcp (0.1.0)
+      mcp (>= 0.13.0)
 
 PATH
   remote: ../picoruby-docs-collector
@@ -24,6 +25,12 @@ PATH
   remote: ../ruby-knowledge-store
   specs:
     ruby_knowledge_store (0.1.0)
+
+PATH
+  remote: ../ruby-rdoc-collector
+  specs:
+    ruby_rdoc_collector (0.1.0)
+      oga
 
 PATH
   remote: ../rurema-collector
@@ -41,6 +48,8 @@ GEM
   specs:
     addressable (2.8.9)
       public_suffix (>= 2.0.2, < 8.0)
+    ansi (1.6.0)
+    ast (2.4.3)
     bigdecimal (4.1.0)
     drb (2.2.3)
     ffi (1.17.4-arm64-darwin)
@@ -54,9 +63,12 @@ GEM
     json-schema (6.2.0)
       addressable (~> 2.8)
       bigdecimal (>= 3.1, < 5)
-    mcp (0.10.0)
+    mcp (0.13.0)
       json-schema (>= 4.1)
     nkf (0.2.0)
+    oga (3.4)
+      ast
+      ruby-ll (~> 2.1)
     onnxruntime (0.11.1-arm64-darwin)
       ffi
     onnxruntime (0.11.1-x86_64-darwin)
@@ -68,6 +80,9 @@ GEM
     public_suffix (7.0.5)
     rack (3.2.6)
     rake (13.3.1)
+    ruby-ll (2.1.4)
+      ansi
+      ast
     sqlite-vec (0.1.9-arm64-darwin)
     sqlite-vec (0.1.9-x86_64-darwin)
     sqlite-vec (0.1.9-x86_64-linux)
@@ -98,6 +113,7 @@ DEPENDENCIES
   picoruby_docs_collector!
   rake
   ruby_knowledge_store!
+  ruby_rdoc_collector!
   rurema_collector!
   sqlite-vec
   sqlite3
@@ -106,6 +122,8 @@ DEPENDENCIES
 
 CHECKSUMS
   addressable (2.8.9) sha256=cc154fcbe689711808a43601dee7b980238ce54368d23e127421753e46895485
+  ansi (1.6.0) sha256=ac9ea0c0ea8d32fb4e271348e609963ac78882f34b73836c2a02b3622e666658
+  ast (2.4.3) sha256=954615157c1d6a382bc27d690d973195e79db7f55e9765ac7c481c60bdb4d383
   bigdecimal (4.1.0) sha256=6dc07767aa3dc456ccd48e7ae70a07b474e9afd7c5bc576f80bd6da5c8dd6cae
   bitclust-core (1.4.0)
   chiebukuro_mcp (0.1.0)
@@ -117,8 +135,9 @@ CHECKSUMS
   informers (1.2.1) sha256=f686f745f640333b9cbfbb380fcdd62d48cff78b8fd9f33ec2dfed1b5d1ecf6e
   json (2.19.3) sha256=289b0bb53052a1fa8c34ab33cc750b659ba14a5c45f3fcf4b18762dc67c78646
   json-schema (6.2.0) sha256=e8bff46ed845a22c1ab2bd0d7eccf831c01fe23bb3920caa4c74db4306813666
-  mcp (0.10.0) sha256=09b9231eb16dff75cc7b8a95817c8acfcf4d1cab8d34f350671e43e765242b57
+  mcp (0.13.0) sha256=8e5e72ec9cc8d37b048e41a4b469689c5897b4768843ef8e5eb36fa8897eb1d5
   nkf (0.2.0) sha256=fbc151bda025451f627fafdfcb3f4f13d0b22ae11f58c6d3a2939c76c5f5f126
+  oga (3.4) sha256=953039cd7be8dc50dfdafe052588e369c707ff1a82e06980b90944e1a1061b6d
   onnxruntime (0.11.1-arm64-darwin) sha256=6d205e1adfcb77f0330b46ea9dcd3da9199034408dd5f58d56afca8e70fb686c
   onnxruntime (0.11.1-x86_64-darwin) sha256=acdcbfbc937273fb27fd98587fde18199bb03dcd525f2da5324da42c97631eb9
   onnxruntime (0.11.1-x86_64-linux) sha256=90a47c9ab70103cdd4dd2b99b5179dfed909b44ceb77a1cf076e9dcff925079c
@@ -128,7 +147,9 @@ CHECKSUMS
   public_suffix (7.0.5) sha256=1a8bb08f1bbea19228d3bed6e5ed908d1cb4f7c2726d18bd9cadf60bc676f623
   rack (3.2.6) sha256=5ed78e1f73b2e25679bec7d45ee2d4483cc4146eb1be0264fc4d94cb5ef212c2
   rake (13.3.1) sha256=8c9e89d09f66a26a01264e7e3480ec0607f0c497a861ef16063604b1b08eb19c
+  ruby-ll (2.1.4) sha256=bec3a40078e4b8578b20751f0b2e3dc3fcaa773e34fae3d9725b724032e47e0c
   ruby_knowledge_store (0.1.0)
+  ruby_rdoc_collector (0.1.0)
   rurema_collector (0.1.0)
   sqlite-vec (0.1.9-arm64-darwin) sha256=f319ab08757741811c6f2f7d2b58c1b9009460e899e1b69d99fdab288286d9bf
   sqlite-vec (0.1.9-x86_64-darwin) sha256=8a8d16c86c8d011359b0ab6f933dc9859f1cc265be6a8a9ac20ecd06cb3b8d32
