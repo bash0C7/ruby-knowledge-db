@@ -30,3 +30,9 @@ sources:
 
   picoruby_docs:
     repo_path: ~/dev/src/github.com/picoruby/picoruby
+
+  # ruby/ruby trunk RDoc (en) → JP translation.
+  # Data source: pre-built darkfish HTML tarball from cache.ruby-lang.org.
+  # No ruby/ruby clone needed. No cache:prepare dependency.
+  ruby_rdoc:
+    url: https://cache.ruby-lang.org/pub/ruby/doc/ruby-docs-en-master.tar.xz
