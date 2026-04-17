@@ -330,8 +330,15 @@ embedding.pack("f*")   # float 配列 → blob
 | `scripts/import_esa_export.rb` | esa エクスポート一括 import |
 | `db/last_run.yml` | since 永続化ファイル（git 管理外）|
 | `test/test_helper.rb` | StubEmbedder + 共通セットアップ |
+| `.claude/commands/ruby-knowledge-db.md` | 統合スラッシュコマンド — 意図解釈 → subagent dispatch |
+| `.claude/agents/ruby-knowledge-db-run.md` | 書き込み系 subagent（pipeline / 個別 phase / 破壊的削除、PLAN→CONFIRMED ゲート）|
+| `.claude/agents/ruby-knowledge-db-inspect.md` | 読み取り系 subagent（stats / scan / find_duplicates / bookmark / ad-hoc SELECT、ゲートなし）|
 
 MCP サーバーの起動は `chiebukuro-mcp` リポジトリの `exe/chiebukuro-mcp serve` に委譲する（このリポジトリに `bin/serve` や `scripts/start_mcp.sh` は存在しない）。
+
+### Claude Code 経由の運用
+
+統合コマンド `/ruby-knowledge-db` が router。`rake -T` で現行タスク一覧を動的取得し、ユーザー引数から意図を解釈、不明なら半動的メニュー（取り込み / 確認 / 掃除 / rake -T / その他）を提示。確認後に適切な subagent へ dispatch する（書き込み系は `ruby-knowledge-db-run`、読み取り系は `ruby-knowledge-db-inspect`）。新しい `rake` タスクを足しても、router が `rake -T` を再取得するので command 側は改修不要。
 
 ## Responsibility boundary (chiebukuro-mcp agent schema)
 

@@ -198,15 +198,17 @@ mruby_trunk: { ... }
 
 rurema / picoruby_docs 系の docs collector は従来通り flat string 形式（`RuremaCollector::Collector: '2026-04-16'`）で、キー空間が分離されているため共存する。
 
-#### Claude Code subagent 経由の推奨フロー
+#### Claude Code 経由の推奨フロー
 
-手動 `rake` 実行も可能やが、Claude Code では `ruby-knowledge-db-trunk-changes-daily` subagent 経由が推奨:
+手動 `rake` 実行も可能やが、Claude Code では統合スラッシュコマンド `/ruby-knowledge-db` 経由が推奨。
 
-- **PLAN モード** — `db/last_run.yml` を読んで FLOOR（`min(last_completed_before)`）を自動算出、WIP 検出、対象ソース一覧を報告
-- **CONFIRMED ゲート** — PLAN 内容をユーザーが確認後、`CONFIRMED SINCE=... BEFORE=...` トークン付きで再 dispatch した時のみ EXECUTE
-- **EXECUTE モード** — `rake` + 事後の `db:scan_pollution` / `esa:find_duplicates` 自動実行
+動作:
 
-Claude Code スラッシュコマンド `/ruby-knowledge-db-trunk-changes-daily` で起動。
+1. **意図解釈** — `rake -T` で現行タスク一覧を取得し、ユーザー引数から意図を解釈。引数が不明瞭なら半動的メニュー（取り込み / 確認 / 掃除 / rake -T / その他）を提示
+2. **認識あわせ** — 解釈内容をユーザーにエコーバックして承認取得
+3. **subagent dispatch** — 書き込み系は `ruby-knowledge-db-run`（PLAN → CONFIRMED ゲート → EXECUTE）、読み取り系は `ruby-knowledge-db-inspect`（直接実行）
+
+書き込み系の subagent は `db/last_run.yml` を読んで FLOOR（`min(last_completed_before)`）を自動算出し、WIP 検出や事後 pollution scan（`db:scan_pollution` / `esa:find_duplicates`）までワンストップで実施する。
 
 ### 運用と監視（非決定論対策）
 
@@ -219,6 +221,10 @@ APP_ENV=production bundle exec rake cache:prepare
 ```
 
 各 `*_trunk` source の `repo_path` に対して `git fetch origin <branch>` → `git checkout -f -B <branch> origin/<branch>` → `git submodule update --init --recursive --force` を強制実行。**どれか1つでも失敗したら即 abort**。前提: working copy は常にクリーン、ローカルブランチは都度作り直し、submodule は再帰再初期化。`rake` の prereq になっているので、通常は明示呼び出し不要。
+
+#### esa preflight（事前、`rake` 先頭で自動ガード）
+
+`lib/ruby_knowledge_db/esa_preflight.rb` が `rake` 起動直後に `SINCE`〜`BEFORE` の半開区間で `{category}/{YYYY}/{MM}/{DD}/{date}-{short}-trunk-changes` パスを esa API で検索し、ベース名（`(N)` サフィックス除去後）が完全一致する投稿を 1 件でも検出したら hard abort する。Phase 単体コマンド（`rake generate:*` / `import:*` / `esa:*` 個別）経由の投稿で bookmark が進んでへん状態で `rake` を再実行した時の `(1)` 重複投稿を事前遮断する目的。bypass フラグは無い — 検出されたら人間が esa 側を手動で cleanup してから再実行する運用。
 
 #### db:scan_pollution（事後、read-only）
 
