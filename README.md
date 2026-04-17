@@ -279,8 +279,14 @@ bundle exec rake update:rurema
 # PicoRuby docs 更新
 bundle exec rake update:picoruby_docs
 
-# ruby/ruby RDoc JP 翻訳更新（初回 ~$23 / 30-60 min、2回目以降はキャッシュで即時）
-APP_ENV=production SINCE=2026-04-17 BEFORE=2026-04-18 bundle exec rake update:ruby_rdoc
+# ruby/ruby RDoc JP 翻訳更新（tarball 未変更 + baseline 非空なら fast-path で no-op）
+APP_ENV=production bundle exec rake update:ruby_rdoc
+# 成果物:
+#   DB:  ruby/ruby:rdoc/trunk/{ClassName} レコード
+#   MD:  /tmp/ruby-rdoc-<timestamp>/{SanitizedClassName}.md（デバッグ用、残す）
+#   baseline: ~/.cache/ruby-rdoc-collector/source_hashes.yml（クラス単位の差分検出）
+#   last_run.yml: RubyRdocCollector::Collector キーに完了時刻を ISO8601 で記録
+# SINCE/BEFORE は受け付けない（tarball は常に最新、差分検出は class-level source_hash）
 
 # DB 一括更新（docs 系 collector の since を db/last_run.yml の flat-string 形式から自動取得。trunk 系とは別スキーマ）
 bundle exec ruby scripts/update_all.rb
