@@ -8,7 +8,8 @@ Rake::TestTask.new(:test) do |t|
   t.verbose = true
 end
 
-task default: :test
+# default task = full pipeline (defined at bottom of this file).
+# For tests: `bundle exec rake test`.
 
 # ---- 共通ヘルパー（遅延ロード、用途別） ----
 def require_base
@@ -681,18 +682,21 @@ namespace :esa do
   end
 end
 
-# ---- daily: 昨日分の全ソース一括処理 ----
-desc "Run daily pipeline: generate → import → esa for all trunk sources (SINCE/BEFORE auto-set to yesterday/today)"
-task daily: :'cache:prepare' do
+# ---- default: 昨日分の全ソース一括処理（trunk + update:* + iCloud copy）----
+desc "Run full pipeline: trunk generate → import → esa + every update:* task + iCloud copy (SINCE/BEFORE auto-set to yesterday/today)"
+task default: :'cache:prepare' do
   require_generate_deps
   require_import_deps
   require_esa_deps
+  require_update_deps
   require_relative 'lib/ruby_knowledge_db/esa_preflight'
   RubyKnowledgeDb::Config.ensure_write_host!
 
   since  = ENV['SINCE']  || (Date.today - 1).to_s
   before = ENV['BEFORE'] || Date.today.to_s
-  puts "=== daily: #{since} → #{before} ==="
+  ENV['SINCE']  = since
+  ENV['BEFORE'] = before
+  puts "=== pipeline: #{since} → #{before} ==="
 
   cfg     = RubyKnowledgeDb::Config.load
 
@@ -797,9 +801,16 @@ task daily: :'cache:prepare' do
     store.close
   end
 
-  # Ruby trunk RDoc も ruby_knowledge DB に同居させる
-  puts "\n--- ruby_rdoc ---"
-  Rake::Task['update:ruby_rdoc'].invoke
+  # Dynamically invoke every `update:*` task (update:ruby_rdoc / update:rurema /
+  # update:picoruby_docs / any future additions). Adding a new data source =
+  # defining a new `task :foo` under `namespace :update` — no edits here required.
+  update_tasks = Rake.application.tasks
+    .select { |t| t.name.start_with?('update:') }
+    .sort_by(&:name)
+  update_tasks.each do |t|
+    puts "\n--- #{t.name} ---"
+    t.invoke
+  end
 
   # DB を chiebukuro-mcp 参照先にコピー
   copy_to = cfg['db_copy_to']
@@ -811,5 +822,5 @@ task daily: :'cache:prepare' do
     puts "db: copied to #{dst}"
   end
 
-  puts "\n=== daily complete ==="
+  puts "\n=== pipeline complete ==="
 end

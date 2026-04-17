@@ -175,17 +175,17 @@ APP_ENV=test DIR=$DIR bundle exec rake esa:picoruby_trunk
 - MD ファイル名: `YYYY-MM-DD-diff.md` / `YYYY-MM-DD-article.md` / `YYYY-MM-DD-article-{submodule}.md`
 - import 対象: article + diff 全ファイルが DB に格納される。esa には article のみ投稿（`*-article.md` マッチ）
 
-### rake daily（日次一括処理）
+### rake（日次一括処理・デフォルトタスク）
 
 ```bash
 # 昨日分を自動処理（SINCE=昨日, BEFORE=今日 を自動設定）
-APP_ENV=production bundle exec rake daily
+APP_ENV=production bundle exec rake
 
 # 特定日を指定
-APP_ENV=production SINCE=2026-04-10 BEFORE=2026-04-11 bundle exec rake daily
+APP_ENV=production SINCE=2026-04-10 BEFORE=2026-04-11 bundle exec rake
 ```
 
-全 `_trunk` ソース（picoruby/cruby/mruby）を順次 generate → import → esa 投稿。続けて `update:ruby_rdoc` を invoke し、最後に `db_copy_to` で chiebukuro-mcp 参照先（iCloud）にコピーまで行う。Store は共有して1回だけ開く。rdoc も同じ `ruby_knowledge.db` に同居。
+デフォルトタスクが全パイプライン。全 `_trunk` ソース（picoruby/cruby/mruby）を順次 generate → import → esa 投稿。続けて `namespace :update` 配下の全 `update:*` タスクを動的発見して順次 invoke（現状は `update:picoruby_docs` / `update:ruby_rdoc` / `update:rurema` — 新しいデータソースを増やす時は `task :foo` を `namespace :update` に追加するだけで自動で取り込まれる）。最後に `db_copy_to` で chiebukuro-mcp 参照先（iCloud）にコピーまで行う。Store は共有して1回だけ開く。rdoc/rurema/picoruby_docs も同じ `ruby_knowledge.db` に同居。テストを回す時は `bundle exec rake test`。
 
 ### esa フルパスルール
 
@@ -225,18 +225,18 @@ submodule: `### (submodule名)[submodule GitHub URL] [変更内容タイトル](
 
 Claude CLI の記事生成は**非決定論**（同じ入力で毎回違う出力）。これに起因する運用上の罠と決定論的対策:
 
-- **再実行で重複が積もる**: `rake daily` が途中失敗した後そのまま再実行すると、Claude CLI は違う文体で記事を再生成する → `content_hash` が一致せず DB 重複、esa 側も同名（`(1)` サフィックス）で二重投稿。対処: 事後に `rake db:scan_pollution` / `rake esa:find_duplicates` を必ず回す。なお `rake daily` は partial 失敗時に `last_completed_*` を書かへんため subagent PLAN で `wip=true` が立つ — 次の再実行で自動的に同じ SINCE から拾い直すが、**既に投稿済みの esa 記事は `(1)` 重複になる**ので、WIP 検出を見たら必ず `esa:find_duplicates` で該当日を確認する。
-- **generate フェーズの git stderr が exit 0 に埋もれる**: GitOps.setup や submodule update のエラーが silent failure になり、空データで記事生成 → 空メタ記事混入。trunk-changes-diary 5810d4c で submodule 側は on-demand fetch ガード済み。親リポ側は `rake cache:prepare`（`rake daily` の prereq）が fetch→reset→submodule 再帰を強制実行して事前検知。
+- **再実行で重複が積もる**: `rake` が途中失敗した後そのまま再実行すると、Claude CLI は違う文体で記事を再生成する → `content_hash` が一致せず DB 重複、esa 側も同名（`(1)` サフィックス）で二重投稿。対処1: `rake` は esa preflight で SINCE/BEFORE 範囲に既存投稿があれば hard abort（`EsaPreflight.check_conflicts!`）。対処2: 事後に `rake db:scan_pollution` / `rake esa:find_duplicates` を必ず回す。なお `rake` は partial 失敗時に `last_completed_*` を書かへんため subagent PLAN で `wip=true` が立つ — 次の再実行で自動的に同じ SINCE から拾い直すが、**既に投稿済みの esa 記事は preflight で検出されて abort する**ので、esa 側を手動で掃除してから再実行する運用。
+- **generate フェーズの git stderr が exit 0 に埋もれる**: GitOps.setup や submodule update のエラーが silent failure になり、空データで記事生成 → 空メタ記事混入。trunk-changes-diary 5810d4c で submodule 側は on-demand fetch ガード済み。親リポ側は `rake cache:prepare`（`rake` の prereq）が fetch→reset→submodule 再帰を強制実行して事前検知。
 - **汚染 cleanup は ID 指定が安全**: `rake db:delete_polluted IDS=...` / `rake esa:delete IDS=...`。どちらも host guard 有効、IDS 未指定は abort。
 
 運用フロー（subagent 経由ではなく手動で回す場合）:
 
 ```bash
-# pre-flight は rake daily に prereq 化済み（明示不要だが、トラブル時は単体実行可）
+# pre-flight は rake のデフォルトタスクに prereq 化済み（明示不要だが、トラブル時は単体実行可）
 APP_ENV=production bundle exec rake cache:prepare
 
 # 本番パイプライン
-APP_ENV=production SINCE=YYYY-MM-DD BEFORE=YYYY-MM-DD bundle exec rake daily
+APP_ENV=production SINCE=YYYY-MM-DD BEFORE=YYYY-MM-DD bundle exec rake
 
 # 事後検査
 APP_ENV=production bundle exec rake db:stats
@@ -258,7 +258,7 @@ APP_ENV=production bundle exec rake esa:delete IDS=104
 `db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。
 `scripts/update_all.rb` が自動読み書き。ARGV[0] で手動上書き可能。
 
-**更新:** `rake daily`（trunk-changes 3フェーズパイプライン）は **二段コミット式 bookmark** を `last_run.yml` に書き込む。各 `*_trunk` ソースごとに Phase 1 開始直前に `last_started_{at,before}` を記録し、Phase 2b（esa 投稿）がエラーなく完走した時だけ `last_completed_{at,before}` を追記する。`last_started_before > last_completed_before`（あるいは `last_completed_*` 欠落）のソースは WIP = 前回実行が完走してへん、というシグナル。次回の SINCE は `min(last_completed_before)` を床にして safe floor から再開（`content_hash` 冪等で重複は自動スキップ）。`rurema` / `picoruby_docs` 系は従来通り flat string（`scripts/update_all.rb` と `namespace :update` が管理）。
+**更新:** `rake`（trunk-changes 3フェーズパイプライン）は **二段コミット式 bookmark** を `last_run.yml` に書き込む。各 `*_trunk` ソースごとに Phase 1 開始直前に `last_started_{at,before}` を記録し、Phase 2b（esa 投稿）がエラーなく完走した時だけ `last_completed_{at,before}` を追記する。`last_started_before > last_completed_before`（あるいは `last_completed_*` 欠落）のソースは WIP = 前回実行が完走してへん、というシグナル。次回の SINCE は `min(last_completed_before)` を床にして safe floor から再開（`content_hash` 冪等で重複は自動スキップ）。`rurema` / `picoruby_docs` 系は従来通り flat string（`scripts/update_all.rb` と `namespace :update` が管理）。
 
 二段コミット bookmark のスキーマ例:
 
@@ -317,7 +317,8 @@ embedding.pack("f*")   # float 配列 → blob
 | `../rurema-collector/` | rurema doctree RD パース（BitClust::RRDParser）|
 | `../picoruby-docs-collector/` | PicoRuby RBS + README 収集 |
 | `lib/ruby_knowledge_db/orchestrator.rb` | 全ソース一括更新オーケストレーション |
-| `lib/ruby_knowledge_db/trunk_bookmark.rb` | `rake daily` の二段 bookmark 管理（load/save/mark_started/mark_completed/status/recommended_since_floor）|
+| `lib/ruby_knowledge_db/trunk_bookmark.rb` | `rake` の二段 bookmark 管理（load/save/mark_started/mark_completed/status/recommended_since_floor）|
+| `lib/ruby_knowledge_db/esa_preflight.rb` | `rake` 起動前の多重実行ガード — esa 側に SINCE/BEFORE 範囲の投稿が既にあれば hard abort |
 | `lib/ruby_knowledge_db/esa_writer.rb` | esa API 投稿 |
 | `lib/ruby_knowledge_db/config.rb` | APP_ENV 別設定ロード |
 | `../ruby-knowledge-store/migrations/001_schema.sql` | memories + FTS5 + vec0 + _sqlite_mcp_meta |
