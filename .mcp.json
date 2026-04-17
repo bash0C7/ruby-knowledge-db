@@ -1,9 +1,8 @@
 {
   "mcpServers": {
     "chiebukuro-mcp": {
-      "command": "bundle",
-      "args": ["exec", "ruby", "exe/chiebukuro-mcp", "serve"],
-      "cwd": "/Users/bash/dev/src/github.com/bash0C7/chiebukuro-mcp"
+      "command": "/Users/bash/dev/src/github.com/bash0C7/chiebukuro-mcp/scripts/start_mcp.sh",
+      "args": []
     }
   }
 }
