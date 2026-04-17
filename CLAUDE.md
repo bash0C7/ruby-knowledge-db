@@ -104,7 +104,7 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 | trunk-changes-diary   | `../trunk-changes-diary`   | Git diff 取得・Claude CLI 記事生成エンジン |
 | rurema-collector      | `../rurema-collector`      | rurema/doctree 収集（内部で rurema/doctree を clone/参照）|
 | picoruby-docs-collector | `../picoruby-docs-collector` | picoruby/picoruby の docs（RBS + README）収集 |
-| ruby-rdoc-collector   | `../ruby-rdoc-collector`   | ruby/ruby の RDoc HTML（cache.ruby-lang.org tarball）を取得し Claude CLI haiku で日本語翻訳 |
+| ruby-rdoc-collector   | `../ruby-rdoc-collector`   | ruby/ruby の RDoc HTML（cache.ruby-lang.org tarball）を取得し英語原文のまま格納。JP query 英訳と和訳表示は chiebukuro-mcp 経由のホスト LLM agent 担当 |
 | chiebukuro-mcp        | `../chiebukuro-mcp`        | MCP サーバー（`exe/chiebukuro-mcp serve` を委譲先として使用）|
 | ruby-knowledge-store  | `../ruby-knowledge-store`  | Store / Embedder / Migrator |
 
