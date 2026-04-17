@@ -91,7 +91,7 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 | `rurema/doctree:ruby4.0/{lib}` | るりま Ruby 4.0 ライブラリドキュメント |
 | `rurema/doctree:ruby4.0/{lib}#{class}` | るりま Ruby 4.0 クラスドキュメント |
 | `picoruby/picoruby:docs/{gem}` | PicoRuby gem RBS + README |
-| `ruby/ruby:rdoc/trunk/{ClassName}` | ruby/ruby trunk RDoc の日本語翻訳版（ruby-rdoc-collector）|
+| `ruby/ruby:rdoc/trunk/{ClassName}` | ruby/ruby trunk RDoc の英語原文（ruby-rdoc-collector）。JP query の英訳と和訳表示は chiebukuro-mcp 経由のホスト LLM agent が担当 |
 
 ---
 
@@ -252,7 +252,7 @@ APP_ENV=production bundle exec rake esa:delete IDS=104
 
 `~/.cache/trunk-changes-repos/` に永続。`/tmp` は揮発なので使わない。mutable 前提 = working copy は常にクリーン / ローカルブランチは都度作り直し / submodule は recursive 再初期化、という不変条件を `cache:prepare` が強制する。物理破損（pack 崩れ等）は自動修復不可 → 手動で該当ディレクトリを削除して再 clone するのがエスケープハッチ。
 
-`ruby-rdoc-collector` は `https://cache.ruby-lang.org/pub/ruby/doc/ruby-docs-en-master.tar.xz` を `~/.cache/ruby-rdoc-collector/tarball/` にダウンロード・展開する。ruby/ruby clone は不要（`cache:prepare` 依存なし）。翻訳キャッシュは `~/.cache/ruby-rdoc-collector/translations/` に SHA256 キー（`v2|haiku|<text>` フォーマット）で保存。Translator は `claude --model haiku -p -` を `chdir: '/tmp'` で起動し `~/CLAUDE.md` の persona 漏洩を防ぐ。smoke test 用エスケープハッチとして `RUBY_RDOC_TARGETS=ClassA,ClassB` / `RUBY_RDOC_MAX_METHODS=20` env var を Collector が認識する（default は無制限）。
+`ruby-rdoc-collector` は `https://cache.ruby-lang.org/pub/ruby/doc/ruby-docs-en-master.tar.xz` を `~/.cache/ruby-rdoc-collector/tarball/` にダウンロード・展開する。ruby/ruby clone は不要（`cache:prepare` 依存なし）。**コンテンツは英語原文のまま格納**され、翻訳は chiebukuro-mcp 経由のホスト LLM agent がオンデマンドで行う（meta YAML の `columns.memories.source.hints.note` に指示）。smoke test 用エスケープハッチとして `RUBY_RDOC_TARGETS=ClassA,ClassB` / `RUBY_RDOC_MAX_METHODS=20` env var を Collector が認識する（default は無制限）。
 
 ### since 永続化
 `db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。
@@ -276,6 +276,14 @@ bundle exec ruby scripts/import_md_files.rb <dir> [source]
 # YAML フロントマター除去 + content_hash 重複スキップ
 # ファイル名パターン: YYYY-MM-DD.md のみ（重複ファイル自動除外）
 ```
+
+### db:delete_rdoc: rdoc ソース全削除
+
+```bash
+APP_ENV=production bundle exec rake db:delete_rdoc
+```
+
+`ruby/ruby:rdoc/trunk/%` な行を memories + memories_vec から削除（memories_fts は trigger で自動追従）。パイプライン設計変更（日本語翻訳 → 英語原文）に伴う一括切り替え時や、baseline が壊れた時の escape hatch として使用。host guard 有効（`ensure_write_host!`）。
 
 ### sqlite3 CLI 禁止（sqlite_vec 経由必須）
 
