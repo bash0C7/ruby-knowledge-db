@@ -321,7 +321,12 @@ namespace :update do
     cfg       = RubyKnowledgeDb::Config.load
     store     = build_store(cfg)
     klass_name = 'RubyRdocCollector::Collector'
-    collector = Object.const_get(klass_name).new(cfg['sources']['ruby_rdoc'])
+
+    # APP_ENV 別に baseline を分離 — test/production の DB が別ファイルなのと対応させる
+    app_env = ENV.fetch('APP_ENV', 'development')
+    baseline_path = File.expand_path("~/.cache/ruby-rdoc-collector/source_hashes.#{app_env}.yml")
+    baseline  = RubyRdocCollector::SourceHashBaseline.new(path: baseline_path)
+    collector = Object.const_get(klass_name).new(cfg['sources']['ruby_rdoc'], baseline: baseline)
 
     stored = 0
     skipped = 0

@@ -284,7 +284,7 @@ APP_ENV=production bundle exec rake update:ruby_rdoc
 # 成果物:
 #   DB:  ruby/ruby:rdoc/trunk/{ClassName} レコード
 #   MD:  /tmp/ruby-rdoc-<timestamp>/{SanitizedClassName}.md（デバッグ用、残す）
-#   baseline: ~/.cache/ruby-rdoc-collector/source_hashes.yml（クラス単位の差分検出）
+#   baseline: ~/.cache/ruby-rdoc-collector/source_hashes.{APP_ENV}.yml（APP_ENV ごとに分離、DB と対応）
 #   last_run.yml: RubyRdocCollector::Collector キーに完了時刻を ISO8601 で記録
 # SINCE/BEFORE は受け付けない（tarball は常に最新、差分検出は class-level source_hash）
 
