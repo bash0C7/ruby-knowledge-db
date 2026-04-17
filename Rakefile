@@ -313,9 +313,43 @@ namespace :update do
     run_collector(:picoruby_docs, 'PicorubyDocsCollector::Collector', 'picoruby_docs')
   end
 
-  desc "Update ruby rdoc (downloads tarball, translates, stores). No cache:prepare needed."
+  desc "Update ruby rdoc (streaming per-entity, source_hash differential, intermediate MD files)"
   task :ruby_rdoc do
-    run_collector(:ruby_rdoc, 'RubyRdocCollector::Collector', 'ruby_rdoc')
+    require_update_deps
+    require 'time'
+
+    cfg       = RubyKnowledgeDb::Config.load
+    store     = build_store(cfg)
+    klass_name = 'RubyRdocCollector::Collector'
+    collector = Object.const_get(klass_name).new(cfg['sources']['ruby_rdoc'])
+
+    stored = 0
+    skipped = 0
+    errors = 0
+
+    begin
+      collector.collect do |record|
+        begin
+          id = store.store(record[:content], source: record[:source])
+          id ? (stored += 1) : (skipped += 1)
+        rescue => e
+          errors += 1
+          warn "ERROR store #{record[:source]}: #{e.message}"
+          raise # propagate so Collector treats as yield failure → no baseline update
+        end
+      end
+    ensure
+      store.close
+    end
+
+    puts "ruby_rdoc: stored=#{stored}, skipped=#{skipped}, errors=#{errors}"
+    puts "intermediate MD files: #{collector.output_dir}"
+
+    if errors == 0
+      last_run = load_last_run
+      last_run[klass_name] = Time.now.iso8601
+      save_last_run(last_run)
+    end
   end
 end
 
