@@ -185,7 +185,7 @@ APP_ENV=production bundle exec rake daily
 APP_ENV=production SINCE=2026-04-10 BEFORE=2026-04-11 bundle exec rake daily
 ```
 
-全 `_trunk` ソース（picoruby/cruby/mruby）を順次 generate → import → esa 投稿。Store は共有して1回だけ開く。
+全 `_trunk` ソース（picoruby/cruby/mruby）を順次 generate → import → esa 投稿。続けて `update:ruby_rdoc` を invoke し、最後に `db_copy_to` で chiebukuro-mcp 参照先（iCloud）にコピーまで行う。Store は共有して1回だけ開く。rdoc も同じ `ruby_knowledge.db` に同居。
 
 ### esa フルパスルール
 

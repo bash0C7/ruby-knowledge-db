@@ -790,6 +790,10 @@ task daily: :'cache:prepare' do
     store.close
   end
 
+  # Ruby trunk RDoc も ruby_knowledge DB に同居させる
+  puts "\n--- ruby_rdoc ---"
+  Rake::Task['update:ruby_rdoc'].invoke
+
   # DB を chiebukuro-mcp 参照先にコピー
   copy_to = cfg['db_copy_to']
   if copy_to
