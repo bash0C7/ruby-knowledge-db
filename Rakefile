@@ -687,6 +687,7 @@ task daily: :'cache:prepare' do
   require_generate_deps
   require_import_deps
   require_esa_deps
+  require_relative 'lib/ruby_knowledge_db/esa_preflight'
   RubyKnowledgeDb::Config.ensure_write_host!
 
   since  = ENV['SINCE']  || (Date.today - 1).to_s
@@ -694,6 +695,12 @@ task daily: :'cache:prepare' do
   puts "=== daily: #{since} → #{before} ==="
 
   cfg     = RubyKnowledgeDb::Config.load
+
+  # Multi-execution guard: abort before any generate/import/esa work if esa already
+  # holds posts for the target range. Prevents duplicate `(1)` posts caused by
+  # non-deterministic Claude CLI article regeneration on re-runs.
+  RubyKnowledgeDb::EsaPreflight.check_conflicts!(cfg: cfg, since: since, before: before)
+
   esa_cfg = cfg['esa']
   store   = build_store(cfg)
 
