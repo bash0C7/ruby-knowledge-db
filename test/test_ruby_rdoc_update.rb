@@ -44,10 +44,6 @@ class TestRubyRdocUpdate < Test::Unit::TestCase
     @dir         = Dir.mktmpdir('rdoc_update')
     @baseline    = RubyRdocCollector::SourceHashBaseline.new(path: File.join(@dir, 'baseline.yml'))
     @output_dir  = File.join(@dir, 'out')
-    cache        = RubyRdocCollector::TranslationCache.new(cache_dir: File.join(@dir, 'cache'))
-    @translator  = RubyRdocCollector::Translator.new(
-      runner: ->(_p) { 'JP' }, cache: cache, sleeper: ->(_s) {}
-    )
   end
 
   def teardown
@@ -64,7 +60,6 @@ class TestRubyRdocUpdate < Test::Unit::TestCase
     RubyRdocCollector::Collector.new({},
       fetcher:    StubFetcher.new('/fake'),
       parser:     StubParser.new(entities),
-      translator: @translator,
       formatter:  RubyRdocCollector::MarkdownFormatter.new,
       baseline:   @baseline,
       output_dir: @output_dir)

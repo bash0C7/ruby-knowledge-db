@@ -555,6 +555,42 @@ namespace :db do
     end
     db.close
   end
+
+  desc "Delete all rdoc rows (memories + memories_vec + memories_fts). WHERE source LIKE 'ruby/ruby:rdoc/trunk/%'"
+  task :delete_rdoc do
+    require_base
+    require 'sqlite3'
+    require 'sqlite_vec'
+    RubyKnowledgeDb::Config.ensure_write_host!
+
+    cfg = RubyKnowledgeDb::Config.load
+    db_path = File.expand_path(cfg['db_path'], __dir__)
+    abort "DB not found: #{db_path}" unless File.exist?(db_path)
+
+    db = SQLite3::Database.new(db_path)
+    db.enable_load_extension(true); SqliteVec.load(db); db.enable_load_extension(false)
+
+    before_m = db.get_first_value('SELECT count(*) FROM memories')
+    before_rdoc = db.get_first_value("SELECT count(*) FROM memories WHERE source LIKE 'ruby/ruby:rdoc/trunk/%'")
+    puts "before: memories=#{before_m} (rdoc=#{before_rdoc})"
+
+    ids = db.execute("SELECT id FROM memories WHERE source LIKE 'ruby/ruby:rdoc/trunk/%'").flatten
+    ids.each do |id|
+      db.execute('DELETE FROM memories_vec WHERE memory_id=?', id)
+      db.execute('DELETE FROM memories WHERE id=?', id)
+    end
+
+    after_m   = db.get_first_value('SELECT count(*) FROM memories')
+    after_v   = db.get_first_value('SELECT count(*) FROM memories_vec')
+    after_fts = db.get_first_value('SELECT count(*) FROM memories_fts')
+    puts "after:  memories=#{after_m} memories_vec=#{after_v} memories_fts=#{after_fts} (deleted=#{ids.size})"
+    if after_m == after_v && after_m == after_fts
+      puts "OK: all three tables aligned"
+    else
+      warn "WARN: table counts diverged — investigate"
+    end
+    db.close
+  end
 end
 
 # ---- esa:find_duplicates / esa:delete ----
