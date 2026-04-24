@@ -110,8 +110,8 @@ class FileWalker
       return
     end
     Dir.glob(File.join(sig_dir, '**', '*.rbs')).sort.each do |path|
-      rel = path.sub(/\A#{Regexp.escape(@repo_path)}\//, '')
-      suffix = rel.sub(/\Asig\//, 'sig/').sub(/\.rbs\z/, '')
+      rel    = path.sub(/\A#{Regexp.escape(@repo_path)}\//, '')  # => "sig/..."
+      suffix = rel.sub(/\.rbs\z/, '')                            # => "sig/..." (prefix kept)
       yield(kind: :rbs, path: path, rel_path: rel, source_suffix: suffix)
     end
   end
