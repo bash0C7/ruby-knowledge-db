@@ -314,6 +314,42 @@ end
 
 件数や実行時間の変動情報は書かない (memory `feedback_readme_no_variable_numbers.md` 準拠)。「対応ソース」列挙があれば `ruby/ruby.wasm:docs/*` を追加する程度。
 
+### 8.6 `.claude/agents/ruby-knowledge-db-run.md`
+
+このプロジェクトローカルの subagent は非 trunk 系 collector クラス名をハードコードしているため、以下 2 箇所に `RubyWasmDocsCollector::Collector` を追加する:
+
+1. **PLAN mode の SINCE default 定義部** (行内テーブル): `update:ruby_wasm_docs`: key `RubyWasmDocsCollector::Collector`, or yesterday if absent (`update:picoruby_docs` と同じ扱い) を追加する。
+
+2. **Collector bookmark readback の Ruby one-liner**:
+
+   ```ruby
+   %w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyRdocCollector::Collector]
+   ```
+
+   →
+
+   ```ruby
+   %w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyRdocCollector::Collector RubyWasmDocsCollector::Collector]
+   ```
+
+### 8.7 `.claude/agents/ruby-knowledge-db-inspect.md`
+
+同様に、`last_run` bookmark readback の Ruby one-liner にクラス名を追加する:
+
+```ruby
+%w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyRdocCollector::Collector]
+```
+
+→
+
+```ruby
+%w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyRdocCollector::Collector RubyWasmDocsCollector::Collector]
+```
+
+### 8.8 `.claude/commands/ruby-knowledge-db.md` (router)
+
+変更不要。ルーターは `rake -T` を動的取得するので、`update:ruby_wasm_docs` が Rakefile に定義されれば自動でメニューに現れる。
+
 ## 9. Build sequence
 
 ### Phase 1: ruby-wasm-docs-collector gem (上流)
@@ -334,8 +370,9 @@ end
     - 期待: stored=12, skipped=0
 11. 冪等性確認: 再実行で stored=0, skipped=12
 12. `CLAUDE.md` 更新
-13. 単一 commit: `feat: add ruby-wasm-docs-collector integration`
-14. production フルラン (user 実施): `APP_ENV=production bundle exec rake`
+13. `.claude/agents/ruby-knowledge-db-run.md` と `.claude/agents/ruby-knowledge-db-inspect.md` の collector クラス名配列に `RubyWasmDocsCollector::Collector` 追加 (ruby-knowledge-db-run.md は SINCE default テーブルにも追加)
+14. 単一 commit: `feat: add ruby-wasm-docs-collector integration`
+15. production フルラン (user 実施): `APP_ENV=production bundle exec rake`
 
 ### 検証チェックポイント
 
@@ -344,7 +381,7 @@ end
 | Phase 1 完了時 | `cd ../ruby-wasm-docs-collector && rake test` 全緑 |
 | Phase 2 step 10 | dev DB に `ruby/ruby.wasm:docs/*` 12 行 |
 | Phase 2 step 11 | 冪等 (skipped=12) |
-| Phase 2 step 14 後 | production DB + iCloud 参照先に反映 |
+| Phase 2 step 15 後 | production DB + iCloud 参照先に反映 |
 
 ### Rollback
 
