@@ -16,17 +16,19 @@ Ruby エコシステム（PicoRuby / CRuby / mruby / rurema）のナレッジを
 
 ```
 【このリポジトリ】ruby-knowledge-db
-  ├── ../chiebukuro-mcp/           MCP サーバー（query + semantic_search）
-  ├── ../ruby-knowledge-store/     Store / Embedder / Migrator
-  ├── ../trunk-changes-diary/      Git diff 取得・Claude CLI 記事生成エンジン
-  ├── ../rurema-collector/         rurema/doctree RD パース（BitClust::RRDParser）
-  └── ../picoruby-docs-collector/  PicoRuby RBS + README 収集
+  ├── ../chiebukuro-mcp/             MCP サーバー（query + semantic_search）
+  ├── ../ruby-knowledge-store/       Store / Embedder / Migrator
+  ├── ../trunk-changes-diary/        Git diff 取得・Claude CLI 記事生成エンジン
+  ├── ../rurema-collector/           rurema/doctree RD パース（BitClust::RRDParser）
+  ├── ../picoruby-docs-collector/    PicoRuby RBS + README 収集
+  ├── ../ruby-rdoc-collector/        ruby/ruby RDoc HTML tarball → 英語原文格納
+  └── ../ruby-wasm-docs-collector/   ruby/ruby.wasm RBS + README + docs/ + js-gem README 収集
   ├── lib/ruby_knowledge_db/
   │   ├── orchestrator.rb    全ソース一括更新
   │   ├── esa_writer.rb      esa API 投稿
   │   └── config.rb          APP_ENV 設定ロード
   ├── scripts/
-  │   ├── update_all.rb          手動実行エントリポイント（since 永続化: db/last_run.yml）
+  │   ├── update_all.rb          (legacy) 手動実行エントリポイント — 現状は trunk-changes 系の旧 generator gem に依存しており単独では動作しない。本流は `bundle exec rake`（default task）
   │   ├── import_md_files.rb     MD ファイル一括 import（picoruby trunk 変更記事等）
   │   └── import_esa_export.rb   esa エクスポート一括 import
   └── db/
@@ -260,10 +262,11 @@ APP_ENV=production bundle exec rake esa:delete IDS=104
 `ruby-rdoc-collector` は `https://cache.ruby-lang.org/pub/ruby/doc/ruby-docs-en-master.tar.xz` を `~/.cache/ruby-rdoc-collector/tarball/` にダウンロード・展開する。ruby/ruby clone は不要（`cache:prepare` 依存なし）。**コンテンツは英語原文のまま格納**され、翻訳は chiebukuro-mcp 経由のホスト LLM agent がオンデマンドで行う（meta YAML の `columns.memories.source.hints.note` に指示）。smoke test 用エスケープハッチとして `RUBY_RDOC_TARGETS=ClassA,ClassB` / `RUBY_RDOC_MAX_METHODS=20` env var を Collector が認識する（default は無制限）。
 
 ### since 永続化
-`db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。
-`scripts/update_all.rb` が自動読み書き。ARGV[0] で手動上書き可能。
+`db/last_run.yml` にコレクタークラス名をキーとして最終実行時刻を保存。本流は `Rakefile` の `run_collector` ヘルパー（`namespace :update` 配下）が自動読み書きする。`scripts/update_all.rb` も同ファイルを参照する設計やったが現状 legacy。
 
-**更新:** `rake`（trunk-changes 3フェーズパイプライン）は **二段コミット式 bookmark** を `last_run.yml` に書き込む。各 `*_trunk` ソースごとに Phase 1 開始直前に `last_started_{at,before}` を記録し、Phase 2b（esa 投稿）がエラーなく完走した時だけ `last_completed_{at,before}` を追記する。`last_started_before > last_completed_before`（あるいは `last_completed_*` 欠落）のソースは WIP = 前回実行が完走してへん、というシグナル。次回の SINCE は `min(last_completed_before)` を床にして safe floor から再開（`content_hash` 冪等で重複は自動スキップ）。`rurema` / `picoruby_docs` 系は従来通り flat string（`scripts/update_all.rb` と `namespace :update` が管理）。
+**since 無視 collector の bookmark 値（`RubyWasmDocsCollector::Collector` 等）:** `run_collector` は collector が since を無視するか否かに関わらず `last_run[klass_name] = before` を一律に書き込むため、since 無視 collector のエントリも積まれる。これは collector 側のロジックには使われない **dead value**（情報用ログとしてのみ意味を持つ）。冪等性は `content_hash` で担保されているため bookmark がずれても挙動に影響しない。将来的に「since 無視」フラグを `run_collector` に持たせて bookmark をスキップする選択肢はあるが、現状はシンプルさを優先して全 collector 統一の挙動にしている。
+
+**更新:** `rake`（trunk-changes 3フェーズパイプライン）は **二段コミット式 bookmark** を `last_run.yml` に書き込む。各 `*_trunk` ソースごとに Phase 1 開始直前に `last_started_{at,before}` を記録し、Phase 2b（esa 投稿）がエラーなく完走した時だけ `last_completed_{at,before}` を追記する。`last_started_before > last_completed_before`（あるいは `last_completed_*` 欠落）のソースは WIP = 前回実行が完走してへん、というシグナル。次回の SINCE は `min(last_completed_before)` を床にして safe floor から再開（`content_hash` 冪等で重複は自動スキップ）。`rurema` / `picoruby_docs` / `ruby_wasm_docs` 系は従来通り flat string（`Rakefile` の `namespace :update` が管理。`scripts/update_all.rb` は legacy）。
 
 二段コミット bookmark のスキーマ例:
 
@@ -330,7 +333,7 @@ embedding.pack("f*")   # float 配列 → blob
 | `config/chiebukuro.json.example` | DB 接続設定テンプレート（実設定は `~/chiebukuro-mcp/chiebukuro.json` へ）|
 | `config/sources.yml` | trunk-changes 収集対象リポジトリ設定（`*_trunk` キーから Rake タスク自動生成）|
 | `config/environments/{APP_ENV}.yml` | APP_ENV 別の DB パス・esa 設定 |
-| `scripts/update_all.rb` | 手動実行エントリポイント（since 永続化）|
+| `scripts/update_all.rb` | (legacy) 旧手動実行エントリポイント。trunk-changes 系の旧 generator gem (`picoruby_trunk_changes_generator` 等) に依存しており現状単独実行不可。本流は `bundle exec rake`（default task）|
 | `scripts/import_md_files.rb` | MD ファイル一括 import |
 | `scripts/import_esa_export.rb` | esa エクスポート一括 import |
 | `db/last_run.yml` | since 永続化ファイル（git 管理外）|
