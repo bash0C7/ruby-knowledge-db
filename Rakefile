@@ -45,6 +45,7 @@ def require_update_deps
   require 'rurema_collector'
   require 'picoruby_docs_collector'
   require 'ruby_rdoc_collector'
+  require 'ruby_wasm_docs_collector'
 end
 
 LAST_RUN_PATH = File.expand_path('db/last_run.yml', __dir__)
@@ -312,6 +313,11 @@ namespace :update do
   desc "Update picoruby docs (SINCE=yyyy-mm-dd BEFORE=yyyy-mm-dd)"
   task :picoruby_docs do
     run_collector(:picoruby_docs, 'PicorubyDocsCollector::Collector', 'picoruby_docs')
+  end
+
+  desc "Update ruby.wasm docs (SINCE/BEFORE は無視、content_hash で冪等)"
+  task :ruby_wasm_docs do
+    run_collector(:ruby_wasm_docs, 'RubyWasmDocsCollector::Collector', 'ruby_wasm_docs')
   end
 
   desc "Update ruby rdoc (streaming per-entity, source_hash differential, intermediate MD files)"

@@ -65,7 +65,7 @@ cd /Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db && \
     puts "  FLOOR=#{RubyKnowledgeDb::TrunkBookmark.recommended_since_floor(data, keys).inspect}"
     puts ""
     puts "=== collector bookmarks (flat) ==="
-    %w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyRdocCollector::Collector].each do |k|
+    %w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyRdocCollector::Collector RubyWasmDocsCollector::Collector].each do |k|
       puts "  #{k}: #{data[k].inspect}"
     end
   '

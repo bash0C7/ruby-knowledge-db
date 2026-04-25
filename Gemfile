@@ -16,6 +16,7 @@ gem 'ruby_knowledge_store',              path: '../ruby-knowledge-store'
 gem 'rurema_collector',                  path: '../rurema-collector'
 gem 'picoruby_docs_collector',           path: '../picoruby-docs-collector'
 gem 'ruby_rdoc_collector',               path: '../ruby-rdoc-collector'
+gem 'ruby_wasm_docs_collector',          path: '../ruby-wasm-docs-collector'
 
 group :test do
   gem 'rake'

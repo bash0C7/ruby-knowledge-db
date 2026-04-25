@@ -33,6 +33,11 @@ PATH
       oga
 
 PATH
+  remote: ../ruby-wasm-docs-collector
+  specs:
+    ruby_wasm_docs_collector (0.1.0)
+
+PATH
   remote: ../rurema-collector
   specs:
     rurema_collector (0.1.0)
@@ -114,6 +119,7 @@ DEPENDENCIES
   rake
   ruby_knowledge_store!
   ruby_rdoc_collector!
+  ruby_wasm_docs_collector!
   rurema_collector!
   sqlite-vec
   sqlite3
@@ -150,6 +156,7 @@ CHECKSUMS
   ruby-ll (2.1.4) sha256=bec3a40078e4b8578b20751f0b2e3dc3fcaa773e34fae3d9725b724032e47e0c
   ruby_knowledge_store (0.1.0)
   ruby_rdoc_collector (0.1.0)
+  ruby_wasm_docs_collector (0.1.0)
   rurema_collector (0.1.0)
   sqlite-vec (0.1.9-arm64-darwin) sha256=f319ab08757741811c6f2f7d2b58c1b9009460e899e1b69d99fdab288286d9bf
   sqlite-vec (0.1.9-x86_64-darwin) sha256=8a8d16c86c8d011359b0ab6f933dc9859f1cc265be6a8a9ac20ecd06cb3b8d32

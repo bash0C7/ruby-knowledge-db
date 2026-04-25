@@ -63,6 +63,7 @@ Compute SINCE/BEFORE. Timezone is JST (Asia/Tokyo). Semantics: half-open `[SINCE
   - `default` (or `generate:<*_trunk>`): floor = min of `last_completed_before` across `*_trunk` sources in `db/last_run.yml`. Use the Ruby one-liner below. Surface WIP sources (`last_started_before > last_completed_before` or missing `last_completed_*`) explicitly.
   - `update:rurema`: `db/last_run.yml` key `RuremaCollector::Collector`, or yesterday if absent.
   - `update:picoruby_docs`: key `PicorubyDocsCollector::Collector`, or yesterday if absent.
+  - `update:ruby_wasm_docs`: key `RubyWasmDocsCollector::Collector`, or yesterday if absent.
   - `update:ruby_rdoc`: key `RubyRdocCollector::Collector`, or `2026-04-16` (initial release) if absent. Note: RDoc translation is date-independent (always latest tarball); `SINCE`/`BEFORE` only drive the bookmark.
 
 Trunk bookmark readback (for `default` / `generate:<*_trunk>`):
@@ -90,7 +91,7 @@ cd /Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db && \
   bundle exec ruby -ryaml -e '
     path = "db/last_run.yml"
     data = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
-    %w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyRdocCollector::Collector].each do |k|
+    %w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyRdocCollector::Collector RubyWasmDocsCollector::Collector].each do |k|
       v = data[k]
       puts "#{k}\t#{v.inspect}\t#{v ? v.to_s[0, 10] : "NO_ENTRY"}"
     end

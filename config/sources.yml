@@ -36,3 +36,6 @@ sources:
   # No ruby/ruby clone needed. No cache:prepare dependency.
   ruby_rdoc:
     url: https://cache.ruby-lang.org/pub/ruby/doc/ruby-docs-en-master.tar.xz
+
+  ruby_wasm_docs:
+    repo_path: ~/dev/src/github.com/ruby/ruby.wasm
