@@ -315,7 +315,7 @@ namespace :update do
     run_collector(:picoruby_docs, 'PicorubyDocsCollector::Collector', 'picoruby_docs')
   end
 
-  desc "Update ruby.wasm docs (SINCE/BEFORE は無視、content_hash で冪等)"
+  desc "Update ruby.wasm docs (SINCE/BEFORE 必須だが collector 側は無視、content_hash で冪等)"
   task :ruby_wasm_docs do
     run_collector(:ruby_wasm_docs, 'RubyWasmDocsCollector::Collector', 'ruby_wasm_docs')
   end

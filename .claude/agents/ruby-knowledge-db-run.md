@@ -91,7 +91,7 @@ cd /Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db && \
   bundle exec ruby -ryaml -e '
     path = "db/last_run.yml"
     data = File.exist?(path) ? (YAML.load_file(path) || {}) : {}
-    %w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyRdocCollector::Collector RubyWasmDocsCollector::Collector].each do |k|
+    %w[RuremaCollector::Collector PicorubyDocsCollector::Collector RubyWasmDocsCollector::Collector RubyRdocCollector::Collector].each do |k|
       v = data[k]
       puts "#{k}\t#{v.inspect}\t#{v ? v.to_s[0, 10] : "NO_ENTRY"}"
     end
