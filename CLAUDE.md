@@ -92,6 +92,10 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 | `rurema/doctree:ruby4.0/{lib}#{class}` | るりま Ruby 4.0 クラスドキュメント |
 | `picoruby/picoruby:docs/{gem}` | PicoRuby gem RBS + README |
 | `ruby/ruby:rdoc/trunk/{ClassName}` | ruby/ruby trunk RDoc の英語原文（ruby-rdoc-collector）。JP query の英訳と和訳表示は chiebukuro-mcp 経由のホスト LLM agent が担当 |
+| `ruby/ruby.wasm:docs/sig/{path}` | ruby/ruby.wasm の RBS 型定義 (sig/ 配下) |
+| `ruby/ruby.wasm:docs/readme` | ruby/ruby.wasm ルート README |
+| `ruby/ruby.wasm:docs/{name}` | ruby/ruby.wasm の docs/ 配下ガイド (api / faq / cheat_sheet) |
+| `ruby/ruby.wasm:docs/js-gem` | ruby/ruby.wasm の js gem (`packages/gems/js`) README |
 
 ---
 
@@ -105,6 +109,7 @@ CREATE VIRTUAL TABLE memories_vec  USING vec0(memory_id INTEGER PRIMARY KEY, emb
 | rurema-collector      | `../rurema-collector`      | rurema/doctree 収集（内部で rurema/doctree を clone/参照）|
 | picoruby-docs-collector | `../picoruby-docs-collector` | picoruby/picoruby の docs（RBS + README）収集 |
 | ruby-rdoc-collector   | `../ruby-rdoc-collector`   | ruby/ruby の RDoc HTML（cache.ruby-lang.org tarball）を取得し英語原文のまま格納。JP query 英訳と和訳表示は chiebukuro-mcp 経由のホスト LLM agent 担当 |
+| ruby-wasm-docs-collector | `../ruby-wasm-docs-collector` | ruby/ruby.wasm の sig (RBS) + ルート README + docs/ + js-gem README を収集 |
 | chiebukuro-mcp        | `../chiebukuro-mcp`        | MCP サーバー（`exe/chiebukuro-mcp serve` を委譲先として使用）|
 | ruby-knowledge-store  | `../ruby-knowledge-store`  | Store / Embedder / Migrator |
 
