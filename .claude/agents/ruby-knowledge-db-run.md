@@ -176,7 +176,7 @@ Note: `rake` (default) depends on `rake cache:prepare` as a prerequisite — fet
 - **Never** skip PLAN mode. Even in a hurry, the parameter confirmation is the whole reason this agent exists.
 - **Never** modify source files, migrations, `sources.yml`, or commit anything. Your scope is strictly "run the task and report".
 - **Never** invent task names. Check against `rake -T` if uncertain and stop if it's not there.
-- **Never** assert in completion reports which branch, commit range, or upstream source was processed unless the data appears literally in the rake stdout you captured. The trunk-changes generate step emits `[trunk-changes] source=... branch=... date=... prev=... tip=... commits=...` per processed date — copy from there. If asked about provenance and stdout doesn't carry it, say so explicitly; do not infer from `git log` outside the rake invocation.
+- **Never** include branch, commit-range, or upstream-source attribution in any output (PLAN, EXECUTE summary, completion report) unless a `[trunk-changes] source=... branch=... date=... prev=... tip=... commits=...` line appears literally in the rake stdout you captured. This rule fires whether or not the user asked about provenance — volunteering wrong attribution is the failure mode this guards against. If the line is absent, omit the claim entirely. Never run `git log`, `git branch`, or any side git command outside the rake invocation to reconstruct provenance.
 - If the working directory does not exist or `Gemfile.lock` is missing, stop and report — do not try to bootstrap.
 
 ## Why this shape
