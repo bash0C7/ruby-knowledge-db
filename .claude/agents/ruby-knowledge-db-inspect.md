@@ -105,4 +105,5 @@ If the inspection surfaces cleanup candidates (pollution IDs, duplicate esa post
 - **Never** invoke `python3` or write Python.
 - **Never** touch `/usr/bin/sqlite3` directly — always go through `bundle exec ruby` + `sqlite_vec` (the system binary lacks the vec0 extension, and the project forbids the CLI).
 - **Never** open the DB without `readonly: true` for free-form queries.
+- **Never** make source-provenance claims (which branch a commit belongs to, which release line a row implies) without running a verify command (e.g. `git branch -a --contains <hash>`) and quoting its output. Reading the `source` column of a row is fine; inferring branch lineage from it is not.
 - If the working directory does not exist or `Gemfile.lock` is missing, stop and report.

@@ -156,7 +156,7 @@ Only reached when the prompt contains `CONFIRMED` + all required params.
    ```
 2. Execute the task as a single foreground Bash call. Use a generous `timeout: 600000` (10 min) for pipeline tasks — Claude CLI generation can take several minutes. Destructive deletes are fast (default timeout fine).
 3. Capture stdout/stderr and summarize:
-   - Pipeline: per-source stored/skipped counts, esa posts created, any errors.
+   - Pipeline: per-source stored/skipped counts, esa posts created, any errors, **plus the per-date `[trunk-changes]` provenance lines verbatim** (`source=... branch=... date=... prev=... tip=... commits=...`). Do not paraphrase commit ranges or attribute commits to a branch unless a `[trunk-changes]` line says so.
    - Deletes: count of rows removed / esa HTTP status codes per ID.
 4. If the task exits non-zero, report the failing phase and tail of error output. Do NOT retry, do NOT "fix" source code — that's the user's call.
 5. For pipeline tasks, after success run `bundle exec rake db:stats` and include its output so the user sees the updated DB state. (Do not use `/usr/bin/sqlite3` — the project forbids it, the system binary lacks the vec0 extension.)
@@ -176,6 +176,7 @@ Note: `rake` (default) depends on `rake cache:prepare` as a prerequisite — fet
 - **Never** skip PLAN mode. Even in a hurry, the parameter confirmation is the whole reason this agent exists.
 - **Never** modify source files, migrations, `sources.yml`, or commit anything. Your scope is strictly "run the task and report".
 - **Never** invent task names. Check against `rake -T` if uncertain and stop if it's not there.
+- **Never** assert in completion reports which branch, commit range, or upstream source was processed unless the data appears literally in the rake stdout you captured. The trunk-changes generate step emits `[trunk-changes] source=... branch=... date=... prev=... tip=... commits=...` per processed date — copy from there. If asked about provenance and stdout doesn't carry it, say so explicitly; do not infer from `git log` outside the rake invocation.
 - If the working directory does not exist or `Gemfile.lock` is missing, stop and report — do not try to bootstrap.
 
 ## Why this shape
