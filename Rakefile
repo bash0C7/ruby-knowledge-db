@@ -849,15 +849,20 @@ task default: :'cache:prepare' do
   # Dynamically invoke every `update:*` task (update:ruby_rdoc / update:rurema /
   # update:picoruby_docs / any future additions). Adding a new data source =
   # defining a new `task :foo` under `namespace :update` — no edits here required.
+  # UpdateRunner isolates each task with rescue so a single failure doesn't
+  # kill the rest of the pipeline (notably the iCloud copy below).
+  require_relative 'lib/ruby_knowledge_db/update_runner'
   update_tasks = Rake.application.tasks
     .select { |t| t.name.start_with?('update:') }
     .sort_by(&:name)
-  update_tasks.each do |t|
+  update_failures = RubyKnowledgeDb::UpdateRunner.run(update_tasks) do |t|
     puts "\n--- #{t.name} ---"
-    t.invoke
+  end
+  update_failures.each do |f|
+    warn "ERROR in #{f.task_name}: #{f.error.class}: #{f.error.message}"
   end
 
-  # DB を chiebukuro-mcp 参照先にコピー
+  # DB を chiebukuro-mcp 参照先にコピー — update に失敗があっても部分進捗は sync する
   copy_to = cfg['db_copy_to']
   if copy_to
     src = File.expand_path(cfg['db_path'], __dir__)
@@ -867,5 +872,14 @@ task default: :'cache:prepare' do
     puts "db: copied to #{dst}"
   end
 
-  puts "\n=== pipeline complete ==="
+  if update_failures.empty?
+    puts "\n=== pipeline complete ==="
+  else
+    msg = String.new("=== pipeline finished with #{update_failures.size} update task failure(s) ===\n")
+    update_failures.each do |f|
+      msg << "  - #{f.task_name}: #{f.error.class}: #{f.error.message}\n"
+    end
+    msg << "Re-run individual `rake update:<name>` for those."
+    abort msg
+  end
 end
