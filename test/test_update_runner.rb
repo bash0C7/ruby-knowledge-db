@@ -58,6 +58,13 @@ class TestUpdateRunner < Test::Unit::TestCase
     assert_equal %w[update:a update:b], yielded
   end
 
+  def test_yield_runs_strictly_before_invoke
+    order = []
+    task = StubTask.new('update:x') { order << :invoked }
+    RubyKnowledgeDb::UpdateRunner.run([task]) { |_| order << :yielded }
+    assert_equal %i[yielded invoked], order
+  end
+
   def test_yield_runs_even_when_task_raises
     tasks = [StubTask.new('update:bad') { raise 'kaboom' }]
     yielded = []
