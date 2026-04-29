@@ -42,6 +42,7 @@ end
 
 def require_update_deps
   require_store_deps
+  require_relative 'lib/ruby_knowledge_db/update_runner'
   require 'rurema_collector'
   require 'picoruby_docs_collector'
   require 'ruby_rdoc_collector'
@@ -851,15 +852,11 @@ task default: :'cache:prepare' do
   # defining a new `task :foo` under `namespace :update` — no edits here required.
   # UpdateRunner isolates each task with rescue so a single failure doesn't
   # kill the rest of the pipeline (notably the iCloud copy below).
-  require_relative 'lib/ruby_knowledge_db/update_runner'
   update_tasks = Rake.application.tasks
     .select { |t| t.name.start_with?('update:') }
     .sort_by(&:name)
   update_failures = RubyKnowledgeDb::UpdateRunner.run(update_tasks) do |t|
     puts "\n--- #{t.name} ---"
-  end
-  update_failures.each do |f|
-    warn "ERROR in #{f.task_name}: #{f.error.class}: #{f.error.message}"
   end
 
   # DB を chiebukuro-mcp 参照先にコピー — update に失敗があっても部分進捗は sync する
@@ -875,11 +872,11 @@ task default: :'cache:prepare' do
   if update_failures.empty?
     puts "\n=== pipeline complete ==="
   else
-    msg = String.new("=== pipeline finished with #{update_failures.size} update task failure(s) ===\n")
+    lines = ["=== pipeline finished with #{update_failures.size} update task failure(s) ==="]
     update_failures.each do |f|
-      msg << "  - #{f.task_name}: #{f.error.class}: #{f.error.message}\n"
+      lines << "  - #{f.task_name}: #{f.error.class}: #{f.error.message}"
     end
-    msg << "Re-run individual `rake update:<name>` for those."
-    abort msg
+    lines << "Re-run individual `rake update:<name>` for those."
+    abort lines.join("\n")
   end
 end
