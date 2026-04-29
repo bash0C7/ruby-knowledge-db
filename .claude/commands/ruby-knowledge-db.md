@@ -12,7 +12,7 @@ Unified router for the ruby-knowledge-db project. Use this whenever the user ask
   - `rake db:delete_polluted IDS=...` / `rake esa:delete IDS=...` (destructive cleanup)
   - Uses a `CONFIRMED`-token gate so the main session can relay parameters to the user for approval.
 - **inspect-agent** (`ruby-knowledge-db-inspect`) — read-only:
-  - `rake -T`, `rake db:stats`, `rake db:scan_pollution`, `rake esa:find_duplicates`, `db/last_run.yml` readback, ad-hoc SQL SELECT.
+  - `rake -T`, `rake plan`, `rake db:stats`, `rake db:scan_pollution`, `rake esa:find_duplicates`, `db/last_run.yml` readback, ad-hoc SQL SELECT.
   - No gate — safe to run immediately.
 
 ## Flow
@@ -78,7 +78,7 @@ Based on the confirmed intent:
 
 | Menu choice | Dispatch target                                                           |
 |-------------|---------------------------------------------------------------------------|
-| 1. 取り込み   | `ruby-knowledge-db-run` subagent (PLAN first, then CONFIRMED on approval) |
+| 1. 取り込み   | `ruby-knowledge-db-run` subagent (PLAN first, then CONFIRMED/AUTOCONFIRM on approval) |
 | 2. 確認      | `ruby-knowledge-db-inspect` subagent (direct, no gate)                    |
 | 3. 掃除      | `ruby-knowledge-db-run` subagent (TASK=db:delete_polluted or esa:delete, PLAN then CONFIRMED) |
 | 4. rake -T  | Print the `rake -T` output you already fetched in step 1 — no subagent    |
@@ -86,16 +86,30 @@ Based on the confirmed intent:
 
 #### For `ruby-knowledge-db-run` dispatches (choices 1 and 3)
 
-First invocation: PLAN mode. Prompt template:
+**Pipeline tasks (`default`, `generate:<*_trunk>`)** have a fast path. Before dispatching, run `rake plan` via the inspect-agent (or directly in the main session — it's read-only):
+
+```
+INTENT=plan [SINCE=...] [BEFORE=...] [APP_ENV=production]
+```
+
+Parse the JSON output's `consistent` field:
+
+- **`consistent: true`** → echo SINCE/BEFORE to the user (step 4 confirmation), then dispatch with **`AUTOCONFIRM`** in one shot (no separate PLAN round-trip):
+
+  ```
+  AUTOCONFIRM TASK=<task> SINCE=<plan.since> BEFORE=<plan.before> APP_ENV=<v>
+  ```
+
+- **`consistent: false`** → relay `contradiction_reasons` verbatim to the user. Wait for the user to either (a) fix the underlying issue (e.g. `rake esa:delete IDS=...`) and re-invoke `/ruby-knowledge-db`, or (b) explicitly approve a forced run, in which case dispatch with **`CONFIRMED ... RKDB_FORCE=1`**.
+
+**Destructive tasks (`db:delete_polluted`, `esa:delete`) and non-trunk `update:*`** still use the legacy two-step PLAN → CONFIRMED flow. First invocation:
 
 ```
 TASK=<resolved task> [SINCE=...] [BEFORE=...] [IDS=...] [APP_ENV=...]
 [free-form context from the user]
 ```
 
-The subagent will compute defaults it needs (SINCE from bookmark, etc.) and report back. Relay its PLAN to the user and ask for confirmation.
-
-Second invocation (on approval): add `CONFIRMED` to the prompt along with the exact parameter values from the PLAN:
+Relay the subagent's PLAN to the user. On approval, second invocation:
 
 ```
 CONFIRMED TASK=<task> SINCE=<v> BEFORE=<v> [IDS=<v>] [APP_ENV=<v>]
@@ -119,6 +133,6 @@ When the subagent returns, relay its output back to the user. Keep it concise �
 - **Never** execute `rake` / `rake update:*` / `rake generate:*` / `rake import:*` / `rake esa:*` / `rake db:delete_*` / `rake esa:delete` yourself from the main session — always go through `ruby-knowledge-db-run`.
 - **Never** run ad-hoc write queries against `db/ruby_knowledge.db` yourself — delegate to subagents.
 - **Never** skip step 4 (confirm understanding). Even when `$ARGUMENTS` is explicit, echo back the interpretation before dispatching.
-- **`rake -T` and `rake db:stats`** may be run directly in the main session (both read-only). Anything else: delegate.
+- **`rake -T`, `rake plan`, and `rake db:stats`** may be run directly in the main session (all read-only). Anything else: delegate.
 
 User arguments (optional): $ARGUMENTS

@@ -9,6 +9,7 @@ tools: Bash, Read
 You perform read-only inspection of the ruby-knowledge-db project. Scope covers:
 
 - `rake -T` — list available tasks.
+- `rake plan [SINCE=... BEFORE=...]` — pipeline preflight as JSON (SINCE/BEFORE resolution, bookmark status, esa conflicts, contradiction flags). Read-only — calls esa GET only.
 - `rake db:stats` — memories / memories_vec / memories_fts counts, source distribution, consistency check.
 - `rake db:scan_pollution` — empty-meta markers and duplicate article candidates (read-only).
 - `rake esa:find_duplicates [DATE=YYYY-MM-DD]` — duplicate esa posts scan.
@@ -38,6 +39,7 @@ The prompt should name the intended inspection. Accepted forms:
 | Prompt intent              | Command                                                        |
 |----------------------------|----------------------------------------------------------------|
 | `rake -T` / task list      | `bundle exec rake -T`                                          |
+| `plan` / preflight         | `APP_ENV=production [SINCE=...] [BEFORE=...] bundle exec rake plan` |
 | `db:stats`                 | `APP_ENV=production bundle exec rake db:stats`                 |
 | `db:scan_pollution`        | `APP_ENV=production bundle exec rake db:scan_pollution`        |
 | `esa:find_duplicates`      | `APP_ENV=production bundle exec rake esa:find_duplicates [DATE=...]` |

@@ -19,10 +19,10 @@ You operate in **two modes**: PLAN and EXECUTE. Subagents cannot ask the user in
 
 Parse the task prompt. Decide mode by these rules, in order:
 
-1. **EXECUTE mode** — the prompt contains the literal token `CONFIRMED` (case-sensitive) AND all required parameters for the chosen task (e.g. `SINCE=`/`BEFORE=` for pipeline tasks, `IDS=` for delete tasks).
+1. **EXECUTE mode** — the prompt contains the literal token `CONFIRMED` or `AUTOCONFIRM` (case-sensitive) AND all required parameters for the chosen task (e.g. `SINCE=`/`BEFORE=` for pipeline tasks, `IDS=` for delete tasks). `AUTOCONFIRM` is reserved for pipeline tasks where the router has already verified `rake plan`'s `consistent: true` and is signaling "no contradictions, run silently"; treat both tokens identically when deciding to execute.
 2. **PLAN mode** — otherwise. Compute planned parameters and report. Do NOT execute any write-side task in PLAN mode.
 
-If the prompt supplies parameters without `CONFIRMED`, still treat it as PLAN — echo the parameters for confirmation. Never assume consent.
+If the prompt supplies parameters without `CONFIRMED` / `AUTOCONFIRM`, still treat it as PLAN — echo the parameters for confirmation. Never assume consent.
 
 ## Task routing
 
@@ -54,37 +54,25 @@ Use absolute paths or `cd` at the start of every Bash call. All Ruby / rake comm
 
 Goal: compute and report the exact command the EXECUTE phase will run. Nothing else.
 
+**Decision logic lives in `Rakefile` / `lib/ruby_knowledge_db/pipeline_plan.rb`.** Your job is to read the deterministic output, relay it to the main session, and stop. Do not re-implement SINCE/BEFORE / contradiction logic in this prompt.
+
 ### Pipeline tasks (`default`, `update:*`, `generate:*`)
 
-Compute SINCE/BEFORE. Timezone is JST (Asia/Tokyo). Semantics: half-open `[SINCE, BEFORE)`.
-
-- **BEFORE** default: today (JST). Compute with `TZ=Asia/Tokyo date +%Y-%m-%d`. Do not guess — actually run the command.
-- **SINCE** default: depends on task.
-  - `default` (or `generate:<*_trunk>`): floor = min of `last_completed_before` across `*_trunk` sources in `db/last_run.yml`. Use the Ruby one-liner below. Surface WIP sources (`last_started_before > last_completed_before` or missing `last_completed_*`) explicitly.
-  - `update:rurema`: `db/last_run.yml` key `RuremaCollector::Collector`, or yesterday if absent.
-  - `update:picoruby_docs`: key `PicorubyDocsCollector::Collector`, or yesterday if absent.
-  - `update:ruby_wasm_docs`: key `RubyWasmDocsCollector::Collector`, or yesterday if absent.
-  - `update:ruby_rdoc`: key `RubyRdocCollector::Collector`, or `2026-04-16` (initial release) if absent. Note: RDoc translation is date-independent (always latest tarball); `SINCE`/`BEFORE` only drive the bookmark.
-
-Trunk bookmark readback (for `default` / `generate:<*_trunk>`):
+For `default` and `generate:<*_trunk>`, run `rake plan` and pass its JSON straight back. The plan owns SINCE/BEFORE resolution (bookmark floor → fallback yesterday), WIP detection, esa preflight conflicts, and the contradiction checklist.
 
 ```bash
 cd /Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db && \
-  bundle exec ruby -ryaml -e '
-    require_relative "lib/ruby_knowledge_db/trunk_bookmark"
-    require "yaml"
-    cfg  = YAML.load_file("config/sources.yml") || {}
-    keys = (cfg["sources"] || {}).keys.select { |k| k.to_s.end_with?("_trunk") }
-    data = RubyKnowledgeDb::TrunkBookmark.load("db/last_run.yml")
-    status = RubyKnowledgeDb::TrunkBookmark.status(data, keys)
-    floor  = RubyKnowledgeDb::TrunkBookmark.recommended_since_floor(data, keys)
-    puts "TRUNK_KEYS=#{keys.join(",")}"
-    status.each { |k, s| puts "STATUS\t#{k}\tstarted=#{s[:last_started_before].inspect}\tcompleted=#{s[:last_completed_before].inspect}\twip=#{s[:wip]}" }
-    puts "FLOOR=#{floor.inspect}"
-  '
+  APP_ENV=production [SINCE=...] [BEFORE=...] bundle exec rake plan
 ```
 
-Collector bookmark readback (for `update:*` other than trunk):
+Read the JSON. Key fields:
+
+- `since`, `before`, `since_source` (`explicit` / `bookmark_floor` / `fallback_yesterday`)
+- `consistent` (Boolean) — `true` means no contradictions; safe to AUTOCONFIRM.
+- `contradiction_reasons` (Array<String>) — present whenever `consistent` is `false`. Relay them verbatim.
+- `wip_sources`, `multiple_wip`, `before_is_future`, `esa_conflicts` — supporting detail.
+
+For `update:*` tasks other than trunk, the plan task does not cover them. Fall back to the collector bookmark readback:
 
 ```bash
 cd /Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db && \
@@ -98,9 +86,15 @@ cd /Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db && \
   '
 ```
 
+Defaults for non-trunk update tasks:
+- `update:rurema`: bookmark key `RuremaCollector::Collector`, or yesterday if absent.
+- `update:picoruby_docs`: key `PicorubyDocsCollector::Collector`, or yesterday if absent.
+- `update:ruby_wasm_docs`: key `RubyWasmDocsCollector::Collector`, or yesterday if absent.
+- `update:ruby_rdoc`: key `RubyRdocCollector::Collector`, or `2026-04-16` (initial release) if absent. RDoc translation is date-independent; SINCE/BEFORE only drive the bookmark.
+
 Override rules:
-- Explicit `SINCE` / `BEFORE` in the prompt → use verbatim, note "explicit override".
-- Otherwise use the floor / bookmark values as above.
+- Explicit `SINCE` / `BEFORE` in the prompt → pass them through to `rake plan` (they appear in the plan with `since_source: "explicit"`).
+- Otherwise the plan picks bookmark floor or fallback yesterday — do not second-guess.
 
 APP_ENV: default `production`. Override only if prompt specifies.
 
@@ -127,28 +121,48 @@ For `esa:delete`, do not fetch from esa in PLAN — just echo the IDs. The actua
 
 ### PLAN report format
 
+For pipeline tasks where `rake plan` was used, paste the JSON verbatim and add the routing instruction:
+
 ```
 ## ruby-knowledge-db-run PLAN
 - TASK:    <resolved task>
 - APP_ENV: production
-- (pipeline) SINCE / BEFORE / 対象ソース / bookmark 状態 / WIP 有無
-- (destructive) IDS / 件数 / 事前確認結果
+- rake plan output (verbatim JSON):
+  { ... }
 
 - 実行予定コマンド:
-  APP_ENV=production SINCE=... BEFORE=... bundle exec rake ...
-- 次のアクション: ユーザーに上記で良いか確認し、OK なら
-  `CONFIRMED TASK=<...> SINCE=... BEFORE=... [IDS=...]` で再度このエージェントを呼び出してください。
+  APP_ENV=production SINCE=<plan.since> BEFORE=<plan.before> bundle exec rake ...
+- 次のアクション:
+  - `consistent: true` の場合 → router が `AUTOCONFIRM TASK=... SINCE=... BEFORE=...` で
+    再 dispatch してくる想定（黙って実行）。
+  - `consistent: false` の場合 → ユーザーに `contradiction_reasons` を見せて承認を取り、
+    OK なら `CONFIRMED ... RKDB_FORCE=1 ...` で再 dispatch、または矛盾を解消してから再実行。
 ```
 
-**Do NOT run any write-side rake command in PLAN mode.**
+For destructive tasks or non-trunk `update:*`, the legacy text format is fine:
+
+```
+## ruby-knowledge-db-run PLAN
+- TASK:    <resolved task>
+- APP_ENV: production
+- (destructive) IDS / 件数 / 事前確認結果
+- (update:* non-trunk) SINCE / BEFORE / 対象ソース / bookmark 状態
+
+- 実行予定コマンド:
+  APP_ENV=production [SINCE=... BEFORE=...] [IDS=...] bundle exec rake ...
+- 次のアクション: ユーザーに上記で良いか確認し、OK なら
+  `CONFIRMED TASK=<...> [SINCE=... BEFORE=...] [IDS=...]` で再度このエージェントを呼び出してください。
+```
+
+**Do NOT run any write-side rake command in PLAN mode.** `rake plan` is read-only and OK to run.
 
 ## EXECUTE mode
 
-Only reached when the prompt contains `CONFIRMED` + all required params.
+Only reached when the prompt contains `CONFIRMED` or `AUTOCONFIRM` + all required params.
 
-1. Re-echo the confirmed parameters at the top:
+1. Re-echo the confirmed parameters at the top (note which gate was used):
    ```
-   ## ruby-knowledge-db-run EXECUTE
+   ## ruby-knowledge-db-run EXECUTE (gate=CONFIRMED|AUTOCONFIRM)
    - TASK:    <task>
    - APP_ENV: production
    - SINCE:   <value>     # or IDS: ...
