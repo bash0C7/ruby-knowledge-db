@@ -173,7 +173,12 @@ Only reached when the prompt contains `CONFIRMED` or `AUTOCONFIRM` + all require
    - Pipeline: per-source stored/skipped counts, esa posts created, any errors, **plus the per-date `[trunk-changes]` provenance lines verbatim** (`source=... branch=... date=... prev=... tip=... commits=...`). Do not paraphrase commit ranges or attribute commits to a branch unless a `[trunk-changes]` line says so.
    - Deletes: count of rows removed / esa HTTP status codes per ID.
 4. If the task exits non-zero, report the failing phase and tail of error output. Do NOT retry, do NOT "fix" source code — that's the user's call.
-5. For pipeline tasks, after success run `bundle exec rake db:stats` and include its output so the user sees the updated DB state. (Do not use `/usr/bin/sqlite3` — the project forbids it, the system binary lacks the vec0 extension.)
+   **Before declaring "no side effects" or "prereq abort"**, verify with bookmark / DB / esa state. The default pipeline now isolates each `update:*` task with rescue (`UpdateRunner`), so a non-zero exit can still mean "trunk + N successful updates landed, M update failed, iCloud copy ran". Rake stdout alone is not the ground truth — `db/last_run.yml` deltas, `bundle exec rake db:stats` row counts, and `bundle exec rake esa:find_duplicates` post counts are.
+5. **Pipeline state delta is mandatory for pipeline tasks.** Capture state BEFORE and AFTER the run, report the delta:
+   - `db/last_run.yml`: per-source bookmark before-and-after. Include both trunk two-phase keys (`*_trunk` with `last_started_before` / `last_completed_before`) and non-trunk collector keys (`RuremaCollector::Collector`, `PicorubyDocsCollector::Collector`, `RubyWasmDocsCollector::Collector`, `RubyRdocCollector::Collector`).
+   - `bundle exec rake db:stats`: memories total before-and-after delta.
+   - From rake stdout: which `update:*` succeeded vs failed. UpdateRunner emits `--- update:<name> ---` headers per task and `ERROR in update:<name>:` warns on rescue. List them.
+   - If any `update:*` failed, **label the run "partial completion"** in the report and list the remaining tasks the user can re-run with `APP_ENV=production SINCE=... BEFORE=... bundle exec rake update:<name>`.
 6. For pipeline tasks, **post-run pollution scan is mandatory**. Claude CLI is non-deterministic, so any re-run risks leaking empty-meta articles or duplicates. Also run:
    ```bash
    APP_ENV=production bundle exec rake db:scan_pollution
@@ -191,6 +196,7 @@ Note: `rake` (default) depends on `rake cache:prepare` as a prerequisite — fet
 - **Never** modify source files, migrations, `sources.yml`, or commit anything. Your scope is strictly "run the task and report".
 - **Never** invent task names. Check against `rake -T` if uncertain and stop if it's not there.
 - **Never** include branch, commit-range, or upstream-source attribution in any output (PLAN, EXECUTE summary, completion report) unless a `[trunk-changes] source=... branch=... date=... prev=... tip=... commits=...` line appears literally in the rake stdout you captured. This rule fires whether or not the user asked about provenance — volunteering wrong attribution is the failure mode this guards against. If the line is absent, omit the claim entirely. Never run `git log`, `git branch`, or any side git command outside the rake invocation to reconstruct provenance.
+- **Never** declare "no side effects" or "prereq abort" from rake stdout / exit code alone. The default pipeline rescues each `update:*` task individually (`UpdateRunner`), so non-zero exits routinely coexist with real bookmark / DB / esa writes. Ground truth is `db/last_run.yml` (bookmark deltas), `bundle exec rake db:stats` (memories count delta), and `bundle exec rake esa:find_duplicates DATE=<date>` (post deltas). Cross-check these before reporting a run as a no-op.
 - If the working directory does not exist or `Gemfile.lock` is missing, stop and report — do not try to bootstrap.
 
 ## Why this shape

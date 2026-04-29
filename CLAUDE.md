@@ -286,6 +286,16 @@ APP_ENV=production bundle exec rake db:delete_polluted IDS=1866,1869
 APP_ENV=production bundle exec rake esa:delete IDS=104
 ```
 
+### update:* タスクの partial completion ハンドリング
+
+`rake` default の update フェーズは `RubyKnowledgeDb::UpdateRunner`（`lib/ruby_knowledge_db/update_runner.rb`）で per-task rescue。1 タスクが raise しても残りの `update:*` と iCloud copy は走り抜けて、最後にまとめて `abort` で失敗 task 名を列挙する設計。
+
+- 失敗した task は `warn "ERROR in <task>: <class>: <msg>"` でリアルタイム出力 + 集約 abort メッセージで再列挙
+- iCloud copy は失敗があっても実行（trunk + 成功 update 分の DB 進捗は sync する価値あり）
+- 個別リランは `APP_ENV=production SINCE=<date> BEFORE=<date+1> bundle exec rake update:<name>` で。`content_hash` 冪等やから既存スキップで安全
+- `db/last_run.yml` の collector key（`RuremaCollector::Collector` 等）が rake exit 後も古い値のままなら、その task が実走してへんサイン
+- subagent / inspector は **rake stdout の exit code だけで「副作用ゼロ」「prereq abort」と即断してはいけない**。bookmark / DB stats / esa post の前後 delta を物証として確認すること。`.claude/agents/ruby-knowledge-db-run.md` にも同じルール
+
 ### キャッシュ方針
 
 `~/.cache/trunk-changes-repos/` に永続。`/tmp` は揮発なので使わない。mutable 前提 = working copy は常にクリーン / ローカルブランチは都度作り直し / submodule は recursive 再初期化、という不変条件を `cache:prepare` が強制する。物理破損（pack 崩れ等）は自動修復不可 → 手動で該当ディレクトリを削除して再 clone するのがエスケープハッチ。
