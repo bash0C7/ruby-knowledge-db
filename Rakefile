@@ -365,6 +365,24 @@ namespace :update do
   end
 end
 
+# ---- plan: dry-run preflight (read-only, JSON output) ----
+desc "Show pipeline plan as JSON: SINCE/BEFORE, bookmark status, esa conflicts, contradictions (read-only)"
+task :plan do
+  require_base
+  require_relative 'lib/ruby_knowledge_db/pipeline_plan'
+  require 'json'
+
+  cfg     = RubyKnowledgeDb::Config.load
+  bm_data = RubyKnowledgeDb::TrunkBookmark.load(LAST_RUN_PATH)
+  plan    = RubyKnowledgeDb::PipelinePlan.new(
+    cfg:           cfg,
+    since:         ENV['SINCE'],
+    before:        ENV['BEFORE'],
+    bookmark_data: bm_data
+  )
+  puts JSON.pretty_generate(plan.to_h)
+end
+
 # ---- db:stats: DB 状態確認（sqlite_vec 経由必須） ----
 namespace :db do
   desc "Re-embed all memories with enriched embedding text (source prefix + truncation)"
