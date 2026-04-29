@@ -97,16 +97,12 @@ module RubyKnowledgeDb
       end
     end
 
+    # EsaPreflight.conflicts returns Hashes with symbol keys at the top level
+    # and string keys inside :posts (esa API responses are already string-keyed).
+    # Convert top-level symbols to strings so the whole structure is JSON-friendly,
+    # and pass any new fields through unchanged.
     def serialize_conflicts(conflicts)
-      conflicts.map do |c|
-        {
-          'key'      => c[:key],
-          'date'     => c[:date],
-          'title'    => c[:title],
-          'category' => c[:category],
-          'posts'    => c[:posts].map { |p| { 'number' => p['number'], 'name' => p['name'], 'full_name' => p['full_name'] } }
-        }
-      end
+      conflicts.map { |c| c.transform_keys(&:to_s) }
     end
 
     def compute_esa_conflicts(since, before)
