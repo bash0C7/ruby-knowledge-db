@@ -52,8 +52,8 @@ module RubyKnowledgeDb
       esa_conflicts = compute_esa_conflicts(since_str, before_str)
 
       reasons = []
-      reasons << "WIP 残骸あり: #{wip_sources.join(', ')}"                                if wip_sources.any?
-      reasons << "WIP が複数ソース（#{wip_sources.size}件: #{wip_sources.join(', ')}）"     if multiple_wip
+      reasons << "WIP 残骸あり (#{wip_sources.size}件): #{wip_sources.join(', ')}"          if wip_sources.any?
+      reasons << "bookmark 欠落: #{no_bookmark_sources.join(', ')}"                         if no_bookmark_sources.any?
       reasons << "bookmark 不足（fallback_yesterday 採用）: trunk sources=#{keys.join(', ')}" if source == 'fallback_yesterday' && @explicit_since.nil?
       reasons << "esa 衝突: #{esa_conflicts.size} 件 [#{since_str}, #{before_str})"        if esa_conflicts.any?
       reasons << "SINCE(#{since_str}) >= BEFORE(#{before_str}) は不正な区間"                if since_invalid

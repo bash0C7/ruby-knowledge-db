@@ -124,16 +124,27 @@ class TestPipelinePlan < Test::Unit::TestCase
     assert_false plan.consistent?
   end
 
-  # 9. WIP が複数ソース → multiple_wip + 矛盾
+  # 9. WIP が複数ソース → multiple_wip + 矛盾、ただし WIP reason は単一（重複しない）
   def test_multiple_wip_flag
     bm = {
       'picoruby_trunk' => { 'last_started_before' => '2026-04-29', 'last_completed_before' => '2026-04-28' },
       'cruby_trunk'    => { 'last_started_before' => '2026-04-29', 'last_completed_before' => '2026-04-28' },
       'mruby_trunk'    => { 'last_started_before' => '2026-04-28', 'last_completed_before' => '2026-04-28' }
     }
-    h = build_plan(bookmark_data: bm).to_h
+    plan = build_plan(bookmark_data: bm)
+    h = plan.to_h
     assert_true h['multiple_wip']
     assert_equal 2, h['wip_sources'].size
+    wip_reasons = plan.contradiction_reasons.grep(/WIP/)
+    assert_equal 1, wip_reasons.size, "WIP reason should appear exactly once even when multiple sources are WIP"
+  end
+
+  # 13. no_bookmark_sources は contradiction_reasons に明示される（JSON dump を読まなくて済む）
+  def test_no_bookmark_sources_surfaced_as_reason
+    bm = clean_bookmark.reject { |k, _| k == 'cruby_trunk' }
+    plan = build_plan(bookmark_data: bm)
+    assert_includes plan.to_h['no_bookmark_sources'], 'cruby_trunk'
+    assert_match(/bookmark 欠落.*cruby_trunk/, plan.contradiction_reasons.join("\n"))
   end
 
   # 10. to_h は JSON serializable
