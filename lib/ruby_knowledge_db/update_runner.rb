@@ -19,7 +19,12 @@ module RubyKnowledgeDb
         yield task if block_given?
         begin
           task.invoke
-        rescue => e
+        rescue Interrupt
+          # User-initiated abort (Ctrl+C). Propagate so the whole pipeline stops.
+          raise
+        rescue Exception => e # rubocop:disable Lint/RescueException
+          # Catch SystemExit too: tasks that call `abort` for missing ENV / DB
+          # should be isolated like any other failure, not skip the iCloud copy.
           failures << Failure.new(task_name: task.name, error: e)
         end
       end

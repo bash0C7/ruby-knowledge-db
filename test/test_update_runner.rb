@@ -71,6 +71,18 @@ class TestUpdateRunner < Test::Unit::TestCase
     assert_equal 'y', f.error.message
   end
 
+  def test_interrupt_propagates_through_runner
+    ran = []
+    tasks = [
+      StubTask.new('update:bang')  { ran << :bang; raise Interrupt },
+      StubTask.new('update:never') { ran << :never }
+    ]
+    assert_raise(Interrupt) do
+      RubyKnowledgeDb::UpdateRunner.run(tasks)
+    end
+    assert_equal %i[bang], ran
+  end
+
   def test_systemexit_in_task_does_not_kill_subsequent_tasks
     order = []
     tasks = [
