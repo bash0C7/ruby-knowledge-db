@@ -70,4 +70,21 @@ class TestUpdateRunner < Test::Unit::TestCase
     assert_equal 'x', f.task_name
     assert_equal 'y', f.error.message
   end
+
+  def test_systemexit_in_task_does_not_kill_subsequent_tasks
+    order = []
+    tasks = [
+      StubTask.new('update:ok_first') { order << :first },
+      StubTask.new('update:abort')    { order << :abort_called; raise SystemExit, 1 },
+      StubTask.new('update:ok_last')  { order << :last }
+    ]
+    failures = nil
+    assert_nothing_raised(SystemExit) do
+      failures = RubyKnowledgeDb::UpdateRunner.run(tasks)
+    end
+    assert_equal %i[first abort_called last], order
+    assert_equal 1, failures.size
+    assert_equal 'update:abort', failures.first.task_name
+    assert_kind_of SystemExit, failures.first.error
+  end
 end
