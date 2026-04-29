@@ -25,6 +25,9 @@ Ruby エコシステム（PicoRuby / CRuby / mruby / rurema）のナレッジを
   └── ../ruby-wasm-docs-collector/   ruby/ruby.wasm RBS + README + docs/ + js-gem README 収集
   ├── lib/ruby_knowledge_db/
   │   ├── orchestrator.rb    全ソース一括更新
+  │   ├── pipeline_plan.rb   `rake` / `rake plan` 共通の SINCE/BEFORE 解決 + 矛盾チェッカー
+  │   ├── trunk_bookmark.rb  二段コミット式 bookmark（last_started/last_completed）
+  │   ├── esa_preflight.rb   esa API 衝突検出（read-only conflicts + abort wrapper）
   │   ├── esa_writer.rb      esa API 投稿
   │   └── config.rb          APP_ENV 設定ロード
   ├── scripts/
@@ -185,14 +188,37 @@ APP_ENV=test DIR=$DIR bundle exec rake esa:picoruby_trunk
 ### rake（日次一括処理・デフォルトタスク）
 
 ```bash
-# 昨日分を自動処理（SINCE=昨日, BEFORE=今日 を自動設定）
+# 全自動: SINCE は trunk bookmark floor から自動算出、BEFORE は今日（JST）
 APP_ENV=production bundle exec rake
 
-# 特定日を指定
+# 特定日を指定（明示 override）
 APP_ENV=production SINCE=2026-04-10 BEFORE=2026-04-11 bundle exec rake
+
+# 矛盾検出を抑制して強制実行（初回 bootstrap、既知 WIP リカバリ等の escape hatch）
+APP_ENV=production RKDB_FORCE=1 bundle exec rake
 ```
 
-デフォルトタスクが全パイプライン。全 `_trunk` ソース（picoruby/cruby/mruby）を順次 generate → import → esa 投稿。続けて `namespace :update` 配下の全 `update:*` タスクを動的発見して順次 invoke（現状は `update:picoruby_docs` / `update:ruby_rdoc` / `update:rurema` — 新しいデータソースを増やす時は `task :foo` を `namespace :update` に追加するだけで自動で取り込まれる）。最後に `db_copy_to` で chiebukuro-mcp 参照先（iCloud）にコピーまで行う。Store は共有して1回だけ開く。rdoc/rurema/picoruby_docs も同じ `ruby_knowledge.db` に同居。テストを回す時は `bundle exec rake test`。
+`default` task は **`PipelinePlan`（`lib/ruby_knowledge_db/pipeline_plan.rb`）** に SINCE/BEFORE 計算と矛盾チェックを委譲する。SINCE は明示 ENV → trunk bookmark floor → 昨日（fallback）の優先順で解決。`consistent? == false` なら abort し full plan JSON を stdout に出すので、`rake esa:delete` 等で矛盾解消してから再実行する運用。`RKDB_FORCE=1` で gate を無効化可能。
+
+矛盾チェック項目:
+- WIP 残骸（前回未完了）
+- esa 衝突（SINCE/BEFORE 範囲に既存投稿あり）
+- SINCE >= BEFORE（不正な区間）
+- bookmark 全/一部欠落（fallback_yesterday 採用シグナル）
+- BEFORE 未来日付
+- WIP が複数ソース
+
+全 `_trunk` ソース（picoruby/cruby/mruby）を順次 generate → import → esa 投稿。続けて `namespace :update` 配下の全 `update:*` タスクを動的発見して順次 invoke（現状は `update:picoruby_docs` / `update:ruby_rdoc` / `update:ruby_wasm_docs` / `update:rurema` — 新しいデータソースを増やす時は `task :foo` を `namespace :update` に追加するだけで自動で取り込まれる）。最後に `db_copy_to` で chiebukuro-mcp 参照先（iCloud）にコピーまで行う。Store は共有して1回だけ開く。rdoc/rurema/picoruby_docs も同じ `ruby_knowledge.db` に同居。テストを回す時は `bundle exec rake test`。
+
+### rake plan（dry-run preflight）
+
+```bash
+# 現在の bookmark / SINCE/BEFORE 推奨値 / esa 衝突 / 矛盾フラグを JSON で返す（read-only）
+APP_ENV=production bundle exec rake plan
+APP_ENV=production SINCE=2026-04-28 BEFORE=2026-04-29 bundle exec rake plan
+```
+
+`rake` の冒頭で走る矛盾チェックと **同じ `PipelinePlan` を呼ぶ read-only エンドポイント**。subagent / router はこの JSON を見て `consistent: true` なら `AUTOCONFIRM` で run-agent を直接叩き、`false` なら `contradiction_reasons` をユーザーに見せる。CLI 直接 `bundle exec rake plan | jq .consistent` でも判定可能。
 
 ### esa フルパスルール
 
@@ -232,17 +258,22 @@ submodule: `### (submodule名)[submodule GitHub URL] [変更内容タイトル](
 
 Claude CLI の記事生成は**非決定論**（同じ入力で毎回違う出力）。これに起因する運用上の罠と決定論的対策:
 
-- **再実行で重複が積もる**: `rake` が途中失敗した後そのまま再実行すると、Claude CLI は違う文体で記事を再生成する → `content_hash` が一致せず DB 重複、esa 側も同名（`(1)` サフィックス）で二重投稿。対処1: `rake` は esa preflight で SINCE/BEFORE 範囲に既存投稿があれば hard abort（`EsaPreflight.check_conflicts!`）。対処2: 事後に `rake db:scan_pollution` / `rake esa:find_duplicates` を必ず回す。なお `rake` は partial 失敗時に `last_completed_*` を書かへんため subagent PLAN で `wip=true` が立つ — 次の再実行で自動的に同じ SINCE から拾い直すが、**既に投稿済みの esa 記事は preflight で検出されて abort する**ので、esa 側を手動で掃除してから再実行する運用。
+- **再実行で重複が積もる**: `rake` が途中失敗した後そのまま再実行すると、Claude CLI は違う文体で記事を再生成する → `content_hash` が一致せず DB 重複、esa 側も同名（`(1)` サフィックス）で二重投稿。対処1: `rake` は `PipelinePlan.consistent?` gate（内部で `EsaPreflight.conflicts` を呼ぶ）で SINCE/BEFORE 範囲に既存投稿があれば hard abort、`rake plan` でも PLAN 段階で同じ判定を read-only に取得できる。対処2: 事後に `rake db:scan_pollution` / `rake esa:find_duplicates` を必ず回す。なお `rake` は partial 失敗時に `last_completed_*` を書かへんため `rake plan` の `wip_sources` に立つ — 次の再実行で自動的に同じ SINCE から拾い直すが、**既に投稿済みの esa 記事は preflight で検出されて abort する**ので、esa 側を手動で掃除してから再実行する運用。
 - **generate フェーズの git stderr が exit 0 に埋もれる**: GitOps.setup や submodule update のエラーが silent failure になり、空データで記事生成 → 空メタ記事混入。trunk-changes-diary 5810d4c で submodule 側は on-demand fetch ガード済み。親リポ側は `rake cache:prepare`（`rake` の prereq）が fetch→reset→submodule 再帰を強制実行して事前検知。
 - **汚染 cleanup は ID 指定が安全**: `rake db:delete_polluted IDS=...` / `rake esa:delete IDS=...`。どちらも host guard 有効、IDS 未指定は abort。
 
 運用フロー（subagent 経由ではなく手動で回す場合）:
 
 ```bash
+# 事前確認（read-only): SINCE/BEFORE 推奨値 + 矛盾フラグを JSON で取得
+APP_ENV=production bundle exec rake plan
+
 # pre-flight は rake のデフォルトタスクに prereq 化済み（明示不要だが、トラブル時は単体実行可）
 APP_ENV=production bundle exec rake cache:prepare
 
-# 本番パイプライン
+# 本番パイプライン（SINCE 省略で bookmark floor から自動算出）
+APP_ENV=production bundle exec rake
+# 明示指定する場合
 APP_ENV=production SINCE=YYYY-MM-DD BEFORE=YYYY-MM-DD bundle exec rake
 
 # 事後検査
@@ -266,7 +297,7 @@ APP_ENV=production bundle exec rake esa:delete IDS=104
 
 **since 無視 collector の bookmark 値（`RubyWasmDocsCollector::Collector` 等）:** `run_collector` は collector が since を無視するか否かに関わらず `last_run[klass_name] = before` を一律に書き込むため、since 無視 collector のエントリも積まれる。これは collector 側のロジックには使われない **dead value**（情報用ログとしてのみ意味を持つ）。冪等性は `content_hash` で担保されているため bookmark がずれても挙動に影響しない。将来的に「since 無視」フラグを `run_collector` に持たせて bookmark をスキップする選択肢はあるが、現状はシンプルさを優先して全 collector 統一の挙動にしている。
 
-**更新:** `rake`（trunk-changes 3フェーズパイプライン）は **二段コミット式 bookmark** を `last_run.yml` に書き込む。各 `*_trunk` ソースごとに Phase 1 開始直前に `last_started_{at,before}` を記録し、Phase 2b（esa 投稿）がエラーなく完走した時だけ `last_completed_{at,before}` を追記する。`last_started_before > last_completed_before`（あるいは `last_completed_*` 欠落）のソースは WIP = 前回実行が完走してへん、というシグナル。次回の SINCE は `min(last_completed_before)` を床にして safe floor から再開（`content_hash` 冪等で重複は自動スキップ）。`rurema` / `picoruby_docs` / `ruby_wasm_docs` 系は従来通り flat string（`Rakefile` の `namespace :update` が管理。`scripts/update_all.rb` は legacy）。
+**更新:** `rake`（trunk-changes 3フェーズパイプライン）は **二段コミット式 bookmark** を `last_run.yml` に書き込む。各 `*_trunk` ソースごとに Phase 1 開始直前に `last_started_{at,before}` を記録し、Phase 2b（esa 投稿）がエラーなく完走した時だけ `last_completed_{at,before}` を追記する。`last_started_before > last_completed_before`（あるいは `last_completed_*` 欠落）のソースは WIP = 前回実行が完走してへん、というシグナル。**次回の SINCE は `TrunkBookmark.recommended_since_floor`（= `min(last_completed_before)`）を床にして safe floor から再開する。これは `PipelinePlan` 経由で `rake` の default task と `rake plan` の両方が共有する**（`content_hash` 冪等で重複は自動スキップ）。floor が nil（全/一部欠落）の場合は `Date.today - 1` に fallback するが `consistent? == false` で abort されるので、`RKDB_FORCE=1` か明示 `SINCE=` で bypass する設計。`rurema` / `picoruby_docs` / `ruby_wasm_docs` 系は従来通り flat string（`Rakefile` の `namespace :update` が管理。`scripts/update_all.rb` は legacy）。
 
 二段コミット bookmark のスキーマ例:
 
@@ -326,7 +357,8 @@ embedding.pack("f*")   # float 配列 → blob
 | `../picoruby-docs-collector/` | PicoRuby RBS + README 収集 |
 | `lib/ruby_knowledge_db/orchestrator.rb` | 全ソース一括更新オーケストレーション |
 | `lib/ruby_knowledge_db/trunk_bookmark.rb` | `rake` の二段 bookmark 管理（load/save/mark_started/mark_completed/status/recommended_since_floor）|
-| `lib/ruby_knowledge_db/esa_preflight.rb` | `rake` 起動前の多重実行ガード — esa 側に SINCE/BEFORE 範囲の投稿が既にあれば hard abort |
+| `lib/ruby_knowledge_db/pipeline_plan.rb` | `rake` / `rake plan` 共通の SINCE/BEFORE 解決 + 矛盾チェッカー PORO（`consistent?` で 6 項目検査）|
+| `lib/ruby_knowledge_db/esa_preflight.rb` | esa API 経由の衝突検出（`conflicts` は read-only、`check_conflicts!` は abort wrapper）— `PipelinePlan` から呼ばれる |
 | `lib/ruby_knowledge_db/esa_writer.rb` | esa API 投稿 |
 | `lib/ruby_knowledge_db/config.rb` | APP_ENV 別設定ロード |
 | `../ruby-knowledge-store/migrations/001_schema.sql` | memories + FTS5 + vec0 + _sqlite_mcp_meta |
@@ -347,6 +379,8 @@ MCP サーバーの起動は `chiebukuro-mcp` リポジトリの `exe/chiebukuro
 ### Claude Code 経由の運用
 
 統合コマンド `/ruby-knowledge-db` が router。`rake -T` で現行タスク一覧を動的取得し、ユーザー引数から意図を解釈、不明なら半動的メニュー（取り込み / 確認 / 掃除 / rake -T / その他）を提示。確認後に適切な subagent へ dispatch する（書き込み系は `ruby-knowledge-db-run`、読み取り系は `ruby-knowledge-db-inspect`）。新しい `rake` タスクを足しても、router が `rake -T` を再取得するので command 側は改修不要。
+
+**HITL fast path**: pipeline 系（`default` / `generate:<*_trunk>`）は router がまず `rake plan` を inspect 経由で取得し、JSON の `consistent` フラグを見る。`true` なら `AUTOCONFIRM TASK=... SINCE=... BEFORE=...` で run-agent に一発 dispatch（PLAN→ユーザー承認→CONFIRMED の往復をスキップして黙って実行）。`false` なら `contradiction_reasons` をユーザーに見せて HITL 介入を促す。決定論的な判断（SINCE 推奨値、矛盾検出）は全部 `PipelinePlan` 側に持たせており、subagent / router prompt にはロジックを書かない。
 
 ## Responsibility boundary (chiebukuro-mcp agent schema)
 
