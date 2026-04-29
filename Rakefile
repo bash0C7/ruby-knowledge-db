@@ -872,11 +872,13 @@ task default: :'cache:prepare' do
   if update_failures.empty?
     puts "\n=== pipeline complete ==="
   else
+    verbose = ENV['RKDB_VERBOSE'] == '1'
     lines = ["=== pipeline finished with #{update_failures.size} update task failure(s) ==="]
     update_failures.each do |f|
-      lines << "  - #{f.task_name}: #{f.error.class}: #{f.error.message}"
+      lines << "  - #{RubyKnowledgeDb::UpdateRunner.format_failure(f, verbose: verbose)}"
     end
     lines << "Re-run individual `rake update:<name>` for those."
+    lines << "Set RKDB_VERBOSE=1 to include backtraces." unless verbose
     abort lines.join("\n")
   end
 end

@@ -294,6 +294,7 @@ APP_ENV=production bundle exec rake esa:delete IDS=104
 - iCloud copy は失敗があっても実行（trunk + 成功 update 分の DB 進捗は sync する価値あり）
 - 個別リランは `APP_ENV=production SINCE=<date> BEFORE=<date+1> bundle exec rake update:<name>` で。`content_hash` 冪等やから既存スキップで安全
 - `db/last_run.yml` の collector key（`RuremaCollector::Collector` 等）が rake exit 後も古い値のままなら、その task が実走してへんサイン
+- 失敗詳細を見たい時は `RKDB_VERBOSE=1 bundle exec rake` で abort メッセージ内の各 failure に backtrace（先頭 20 フレーム）が付く
 - subagent / inspector は **rake stdout の exit code だけで「副作用ゼロ」「prereq abort」と即断してはいけない**。bookmark / DB stats / esa post の前後 delta を物証として確認すること。`.claude/agents/ruby-knowledge-db-run.md` にも同じルール
 
 ### キャッシュ方針

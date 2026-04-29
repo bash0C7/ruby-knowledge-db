@@ -30,5 +30,21 @@ module RubyKnowledgeDb
       end
       failures
     end
+
+    # Single-line summary by default; with verbose: true, appends a backtrace
+    # tail (top 20 frames) so callers can opt into a debug dump without
+    # paying the noise cost on every run.
+    # @param failure [Failure]
+    # @param verbose [Boolean]
+    # @return [String]
+    def format_failure(failure, verbose: false)
+      base = "#{failure.task_name}: #{failure.error.class}: #{failure.error.message}"
+      return base unless verbose
+
+      bt = failure.error.backtrace
+      return base if bt.nil? || bt.empty?
+
+      ([base] + bt.first(20).map { |l| "    #{l}" }).join("\n")
+    end
   end
 end
