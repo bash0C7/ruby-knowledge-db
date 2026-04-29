@@ -4,20 +4,6 @@ require_relative '../test/test_helper'
 require_relative '../lib/ruby_knowledge_db/esa_preflight'
 require 'stringio'
 
-class StubEsaSearcher
-  def initialize(posts_by_key = {})
-    @posts_by_key = posts_by_key
-    @calls = []
-  end
-
-  attr_reader :calls
-
-  def search(team:, category:, name:)
-    @calls << { team: team, category: category, name: name }
-    @posts_by_key.fetch([team, category, name], [])
-  end
-end
-
 class TestEsaPreflight < Test::Unit::TestCase
   def cfg
     {

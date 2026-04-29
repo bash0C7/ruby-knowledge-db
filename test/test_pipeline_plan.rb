@@ -5,18 +5,6 @@ require_relative '../lib/ruby_knowledge_db/pipeline_plan'
 require 'date'
 require 'json'
 
-unless defined?(StubEsaSearcher)
-  class StubEsaSearcher
-    def initialize(posts_by_key = {})
-      @posts_by_key = posts_by_key
-    end
-
-    def search(team:, category:, name:)
-      @posts_by_key.fetch([team, category, name], [])
-    end
-  end
-end
-
 class TestPipelinePlan < Test::Unit::TestCase
   TRUNK_KEYS = %w[picoruby_trunk cruby_trunk mruby_trunk].freeze
 
