@@ -728,19 +728,27 @@ task default: :'cache:prepare' do
   # Single contradiction guard: SINCE/BEFORE resolution + WIP detection +
   # esa multi-execution check + future-date / inverted-range checks.
   # See lib/ruby_knowledge_db/pipeline_plan.rb for the full checklist.
+  plan_h = plan.to_h
   unless plan.consistent? || ENV['RKDB_FORCE'] == '1'
     require 'json'
     abort "=== pipeline aborted: contradictions detected ===\n" \
-          "#{JSON.pretty_generate(plan.to_h)}\n" \
+          "#{JSON.pretty_generate(plan_h)}\n" \
           "Resolve the issues above (e.g. `rake esa:find_duplicates` + `rake esa:delete IDS=...` " \
           "for esa conflicts), or set RKDB_FORCE=1 to bypass."
   end
 
-  since  = plan.to_h['since']
-  before = plan.to_h['before']
+  since  = plan_h['since']
+  before = plan_h['before']
   ENV['SINCE']  = since
   ENV['BEFORE'] = before
-  puts "=== pipeline: #{since} → #{before} (since_source=#{plan.to_h['since_source']}) ==="
+  puts "=== pipeline: #{since} → #{before} (since_source=#{plan_h['since_source']}) ==="
+
+  # Re-check esa immediately before the write phase. PipelinePlan already
+  # checked at construction time, but a concurrent run or manual post could
+  # land between then and Phase 2b. Skip when explicitly forced.
+  unless ENV['RKDB_FORCE'] == '1'
+    RubyKnowledgeDb::EsaPreflight.check_conflicts!(cfg: cfg, since: since, before: before)
+  end
 
   esa_cfg = cfg['esa']
   store   = build_store(cfg)
