@@ -707,27 +707,40 @@ namespace :esa do
 end
 
 # ---- default: 昨日分の全ソース一括処理（trunk + update:* + iCloud copy）----
-desc "Run full pipeline: trunk generate → import → esa + every update:* task + iCloud copy (SINCE/BEFORE auto-set to yesterday/today)"
+desc "Run full pipeline: trunk generate → import → esa + every update:* task + iCloud copy. SINCE auto-resolved from bookmark floor; aborts on contradictions (set RKDB_FORCE=1 to bypass)"
 task default: :'cache:prepare' do
   require_generate_deps
   require_import_deps
   require_esa_deps
   require_update_deps
-  require_relative 'lib/ruby_knowledge_db/esa_preflight'
+  require_relative 'lib/ruby_knowledge_db/pipeline_plan'
   RubyKnowledgeDb::Config.ensure_write_host!
 
-  since  = ENV['SINCE']  || (Date.today - 1).to_s
-  before = ENV['BEFORE'] || Date.today.to_s
+  cfg     = RubyKnowledgeDb::Config.load
+  bm_data = RubyKnowledgeDb::TrunkBookmark.load(LAST_RUN_PATH)
+  plan    = RubyKnowledgeDb::PipelinePlan.new(
+    cfg:           cfg,
+    since:         ENV['SINCE'],
+    before:        ENV['BEFORE'],
+    bookmark_data: bm_data
+  )
+
+  # Single contradiction guard: SINCE/BEFORE resolution + WIP detection +
+  # esa multi-execution check + future-date / inverted-range checks.
+  # See lib/ruby_knowledge_db/pipeline_plan.rb for the full checklist.
+  unless plan.consistent? || ENV['RKDB_FORCE'] == '1'
+    require 'json'
+    abort "=== pipeline aborted: contradictions detected ===\n" \
+          "#{JSON.pretty_generate(plan.to_h)}\n" \
+          "Resolve the issues above (e.g. `rake esa:find_duplicates` + `rake esa:delete IDS=...` " \
+          "for esa conflicts), or set RKDB_FORCE=1 to bypass."
+  end
+
+  since  = plan.to_h['since']
+  before = plan.to_h['before']
   ENV['SINCE']  = since
   ENV['BEFORE'] = before
-  puts "=== pipeline: #{since} → #{before} ==="
-
-  cfg     = RubyKnowledgeDb::Config.load
-
-  # Multi-execution guard: abort before any generate/import/esa work if esa already
-  # holds posts for the target range. Prevents duplicate `(1)` posts caused by
-  # non-deterministic Claude CLI article regeneration on re-runs.
-  RubyKnowledgeDb::EsaPreflight.check_conflicts!(cfg: cfg, since: since, before: before)
+  puts "=== pipeline: #{since} → #{before} (since_source=#{plan.to_h['since_source']}) ==="
 
   esa_cfg = cfg['esa']
   store   = build_store(cfg)
