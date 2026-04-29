@@ -132,7 +132,10 @@ When the subagent returns, relay its output back to the user. Keep it concise �
 
 - **Never** execute `rake` / `rake update:*` / `rake generate:*` / `rake import:*` / `rake esa:*` / `rake db:delete_*` / `rake esa:delete` yourself from the main session — always go through `ruby-knowledge-db-run`.
 - **Never** run ad-hoc write queries against `db/ruby_knowledge.db` yourself — delegate to subagents.
-- **Never** skip step 4 (confirm understanding). Even when `$ARGUMENTS` is explicit, echo back the interpretation before dispatching.
+- **Step 4 (confirm understanding)** rules:
+  - **Pipeline tasks with `rake plan` → `consistent: true`**: fast path. Echo the resolved SINCE/BEFORE in one line, then `AUTOCONFIRM` dispatch in the same turn. The explicit "OK?" wait is intentionally dropped — the user can interrupt before the subagent finishes if the parameters look wrong.
+  - **Pipeline tasks with `consistent: false`, destructive tasks (db:delete_polluted / esa:delete), and ambiguous intents**: full confirmation loop — echo, wait for user approval, then `CONFIRMED` dispatch.
+  - **Always** echo the parameters at least once before any dispatch, even on the fast path. No silent execution.
 - **`rake -T`, `rake plan`, and `rake db:stats`** may be run directly in the main session (all read-only). Anything else: delegate.
 
 User arguments (optional): $ARGUMENTS
