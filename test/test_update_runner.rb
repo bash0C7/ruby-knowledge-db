@@ -90,6 +90,31 @@ class TestUpdateRunner < Test::Unit::TestCase
     assert_equal %i[bang], ran
   end
 
+  def test_format_failure_default_excludes_backtrace
+    err = RuntimeError.new('boom')
+    err.set_backtrace(['file.rb:1:in `m`', 'file.rb:2:in `n`'])
+    f = RubyKnowledgeDb::UpdateRunner::Failure.new(task_name: 'update:x', error: err)
+    assert_equal 'update:x: RuntimeError: boom',
+                 RubyKnowledgeDb::UpdateRunner.format_failure(f)
+  end
+
+  def test_format_failure_verbose_includes_backtrace
+    err = RuntimeError.new('boom')
+    err.set_backtrace(['file.rb:1:in `m`', 'file.rb:2:in `n`'])
+    f = RubyKnowledgeDb::UpdateRunner::Failure.new(task_name: 'update:x', error: err)
+    s = RubyKnowledgeDb::UpdateRunner.format_failure(f, verbose: true)
+    assert_match(/update:x: RuntimeError: boom/, s)
+    assert_match(/file\.rb:1:in `m`/, s)
+    assert_match(/file\.rb:2:in `n`/, s)
+  end
+
+  def test_format_failure_verbose_handles_missing_backtrace
+    err = RuntimeError.new('no trace')
+    f = RubyKnowledgeDb::UpdateRunner::Failure.new(task_name: 'update:y', error: err)
+    assert_equal 'update:y: RuntimeError: no trace',
+                 RubyKnowledgeDb::UpdateRunner.format_failure(f, verbose: true)
+  end
+
   def test_systemexit_in_task_does_not_kill_subsequent_tasks
     order = []
     tasks = [
