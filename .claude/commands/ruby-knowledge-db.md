@@ -102,7 +102,35 @@ Parse the JSON output's `consistent` field:
 
 - **`consistent: false`** → relay `contradiction_reasons` verbatim to the user. Wait for the user to either (a) fix the underlying issue (e.g. `rake esa:delete IDS=...`) and re-invoke `/ruby-knowledge-db`, or (b) explicitly approve a forced run, in which case dispatch with **`CONFIRMED ... RKDB_FORCE=1`**.
 
-**Destructive tasks (`db:delete_polluted`, `esa:delete`) and non-trunk `update:*`** still use the legacy two-step PLAN → CONFIRMED flow. First invocation:
+##### Detached pattern monitoring (Pattern B follow-up)
+
+Pipeline tasks (`default`, `generate:<*_trunk>`) run **detached via `screen -dmS`** because they regularly exceed Bash's 10-min timeout. The run-agent returns immediately after launching screen, with a report shaped like:
+
+```
+## ruby-knowledge-db-run EXECUTE — launched (pattern=detached)
+- SESSION: rkdb-default-20260523-010532
+- LOG:     tmp/longrun/rkdb-default-20260523-010532.log
+- PRE state captured: memories=3653, bookmark={...}
+```
+
+When the run-agent returns this shape, do NOT relay it to the user as "done". Instead:
+
+1. Tell the user the pipeline is running detached and that you'll wait for completion.
+2. Launch a background Bash watcher to wait for the `DONE:` sentinel:
+   ```bash
+   until grep -q "^DONE:" tmp/longrun/<session>.log 2>/dev/null; do sleep 30; done
+   echo "RAKE_DONE: $(date -Iseconds)"
+   ```
+   Use `run_in_background: true`. You'll be notified when it completes.
+3. After the notification, re-dispatch the run-agent with `POSTCHECK` to verify state delta + run pollution scan:
+   ```
+   POSTCHECK LOG=tmp/longrun/<session>.log SESSION=<session> PRE_MEMORIES=<n> PRE_BOOKMARK=<inline yaml/json from the launched report>
+   ```
+4. Relay the POSTCHECK report to the user (memories delta, per-update success/fail, esa posts, pollution candidates).
+
+**Hard rule for the router**: only ONE detached pipeline run may be in flight at a time. If the user invokes `/ruby-knowledge-db` again before the previous run's POSTCHECK has finished, surface the in-flight session and wait — do not launch a second screen.
+
+**Destructive tasks (`db:delete_polluted`, `esa:delete`) and non-trunk `update:*`** still use the legacy two-step PLAN → CONFIRMED flow with **foreground execution** (Pattern A). First invocation:
 
 ```
 TASK=<resolved task> [SINCE=...] [BEFORE=...] [IDS=...] [APP_ENV=...]
@@ -114,6 +142,8 @@ Relay the subagent's PLAN to the user. On approval, second invocation:
 ```
 CONFIRMED TASK=<task> SINCE=<v> BEFORE=<v> [IDS=<v>] [APP_ENV=<v>]
 ```
+
+These tasks block until rake exits and the agent returns the full state delta in one shot — no POSTCHECK round-trip needed.
 
 #### For `ruby-knowledge-db-inspect` dispatches (choice 2)
 
