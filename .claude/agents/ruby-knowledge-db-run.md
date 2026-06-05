@@ -19,7 +19,7 @@ You operate in **three modes**: PLAN, EXECUTE, and POSTCHECK. Subagents cannot a
 
 Parse the task prompt. Decide mode by these rules, in order:
 
-1. **POSTCHECK mode** — the prompt contains the literal token `POSTCHECK` AND a `LOG=<path>` (and optionally `SESSION=<name>`). Used to verify state delta after a detached (screen) run completes. Skip PLAN/EXECUTE logic — go straight to verification.
+1. **POSTCHECK mode** — the prompt contains the literal token `POSTCHECK` AND a `LOG=<path>` (and optionally `SESSION=<name>`). Used to verify state delta after a detached (tmux) run completes. Skip PLAN/EXECUTE logic — go straight to verification.
 2. **EXECUTE mode** — the prompt contains the literal token `CONFIRMED` or `AUTOCONFIRM` (case-sensitive) AND all required parameters for the chosen task (e.g. `SINCE=`/`BEFORE=` for pipeline tasks, `IDS=` for delete tasks). `AUTOCONFIRM` is reserved for pipeline tasks where the router has already verified `rake plan`'s `consistent: true` and is signaling "no contradictions, run silently"; treat both tokens identically when deciding to execute.
 3. **PLAN mode** — otherwise. Compute planned parameters and report. Do NOT execute any write-side task in PLAN mode.
 
@@ -168,7 +168,7 @@ The Bash tool's max timeout is **10 min (600000ms)**. Full pipeline runs (`defau
 | Pattern | When to use | Behavior |
 |---------|-------------|----------|
 | **A. Foreground** | Short tasks expected to finish well under 10 min: `db:delete_polluted`, `esa:delete`, single non-trunk `update:*` (rurema / picoruby_docs / ruby_wasm_docs without ruby_rdoc), `import:*` / `esa:*` of a small DIR | Single `Bash` call with `timeout: 600000`. Block until rake exits. Run PRE/POST state delta + pollution scan inline. |
-| **B. Detached (screen)** | Long tasks: `default` (full pipeline), `generate:<*_trunk>`, `update:ruby_rdoc` (slow tarball + per-class translation), or anything explicitly hinted as long in the prompt | Capture PRE-state, launch `screen -dmS` with `DONE: exit=$?` sentinel, return immediately with session name + log path. POST verification is a **separate** follow-up dispatch (main session monitors `DONE:` then re-invokes with `POSTCHECK LOG=... PRE_MEMORIES=... PRE_BOOKMARK=...`). |
+| **B. Detached (tmux)** | Long tasks: `default` (full pipeline), `generate:<*_trunk>`, `update:ruby_rdoc` (slow tarball + per-class translation), or anything explicitly hinted as long in the prompt | Capture PRE-state, launch `tmux new-session -d` with `DONE: exit=$?` sentinel, return immediately with session name + log path. POST verification is a **separate** follow-up dispatch (main session monitors `DONE:` then re-invokes with `POSTCHECK LOG=... PRE_MEMORIES=... PRE_BOOKMARK=...`). |
 
 ### Pattern A (Foreground) — short tasks
 
@@ -194,7 +194,9 @@ The Bash tool's max timeout is **10 min (600000ms)**. Full pipeline runs (`defau
    ```
    Include both outputs verbatim. If candidates surface, **do NOT delete them yourself** — report IDs and wait for a follow-up invocation with `TASK=db:delete_polluted` / `TASK=esa:delete` + explicit `IDS=`.
 
-### Pattern B (Detached / screen) — long pipeline tasks
+### Pattern B (Detached / tmux) — long pipeline tasks
+
+Project CLAUDE.md mandates **tmux** for long-running detached jobs (macOS ships GNU screen 4.00.03 with known `stuff` / `hardcopy` bugs — do not use screen).
 
 1. Re-echo confirmed parameters:
    ```
@@ -204,7 +206,7 @@ The Bash tool's max timeout is **10 min (600000ms)**. Full pipeline runs (`defau
    - SINCE:   <value>
    - BEFORE:  <value>
    ```
-2. Capture PRE-state inline (this MUST happen before launching screen, since the run is async):
+2. Capture PRE-state inline (this MUST happen before launching tmux, since the run is async):
    - `bundle exec rake db:stats` → record memories total
    - `db/last_run.yml` → record all trunk + non-trunk collector keys
    Echo both verbatim in the report (the main session will pass them back via `POSTCHECK PRE_MEMORIES=... PRE_BOOKMARK_*=...`).
@@ -214,13 +216,18 @@ The Bash tool's max timeout is **10 min (600000ms)**. Full pipeline runs (`defau
    LOG=tmp/longrun/${SESSION}.log
    ```
    The task suffix should encode the rake task (e.g. `rkdb-default-20260523-010532`).
-4. `mkdir -p tmp/longrun` then launch ONCE:
+4. `mkdir -p tmp/longrun` then launch ONCE via tmux. **The detached shell does NOT inherit the main session's profile**, so it must set up the Ruby toolchain explicitly: prepend the rbenv shim dir to `PATH` (the project pins Ruby 4.0.1 via `.ruby-version`; bundler 4.0.3 lives only under rbenv). Without this the shell falls back to system `/usr/bin/bundle` (Ruby 2.6) and the run dies in ~1s with `Could not find 'bundler' (4.0.3)`. Do NOT use `bash -lc` (a login shell resolves `/usr/bin/bundle` first and breaks). Log `which bundle` + `ruby -v` as the first lines so the env is auditable:
    ```bash
-   screen -dmS "${SESSION}" bash -c '
-     APP_ENV=production SINCE=<v> BEFORE=<v> bundle exec rake <task> > '"${LOG}"' 2>&1
+   mkdir -p tmp/longrun
+   tmux new-session -d -s "${SESSION}" 'bash -c '\''
+     cd /Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db
+     export PATH="$HOME/.rbenv/shims:$HOME/.rbenv/bin:$PATH"
+     { echo "ENV which bundle: $(which bundle)"; ruby -v; } > '"${LOG}"' 2>&1
+     APP_ENV=production SINCE=<v> BEFORE=<v> bundle exec rake <task> >> '"${LOG}"' 2>&1
      echo "DONE: exit=$? finished_at=$(date -Iseconds)" >> '"${LOG}"'
-   '
+   '\'''
    ```
+   After launching, read the first two log lines and confirm `which bundle` resolves to `…/.rbenv/shims/bundle` (NOT `/usr/bin/bundle`) before reporting success. If it points at system Ruby, the env setup failed — report it instead of claiming the run is healthy.
 5. Return immediately. Do NOT also run rake inline — that produces the twin-dispatch bug (rake runs twice, bookmark / esa state diverges between the two runs). Report shape:
    ```
    ## ruby-knowledge-db-run EXECUTE — launched (pattern=detached)
@@ -263,7 +270,7 @@ Reached when the prompt contains `POSTCHECK LOG=<path>` (and ideally `PRE_MEMORI
 - **Never** skip PLAN mode. Even in a hurry, the parameter confirmation is the whole reason this agent exists.
 - **Never** modify source files, migrations, `sources.yml`, or commit anything. Your scope is strictly "run the task and report".
 - **Never** invent task names. Check against `rake -T` if uncertain and stop if it's not there.
-- **One rake invocation per EXECUTE call.** Pattern A (foreground Bash) and Pattern B (`screen -dmS` detached) are mutually exclusive — picking both means two rake processes run in parallel, divergent bookmark / esa state, and silent corruption (this is the twin-dispatch failure mode that prompted this rule). If the prompt is ambiguous about which pattern to use, treat any `default` or `generate:<*_trunk>` task as Pattern B by default; for everything else, foreground. Never "also" launch a fallback.
+- **One rake invocation per EXECUTE call.** Pattern A (foreground Bash) and Pattern B (`tmux new-session -d` detached) are mutually exclusive — picking both means two rake processes run in parallel, divergent bookmark / esa state, and silent corruption (this is the twin-dispatch failure mode that prompted this rule). If the prompt is ambiguous about which pattern to use, treat any `default` or `generate:<*_trunk>` task as Pattern B by default; for everything else, foreground. Never "also" launch a fallback.
 - **Never** include branch, commit-range, or upstream-source attribution in any output (PLAN, EXECUTE summary, completion report) unless a `[trunk-changes] source=... branch=... date=... prev=... tip=... commits=...` line appears literally in the rake stdout you captured. This rule fires whether or not the user asked about provenance — volunteering wrong attribution is the failure mode this guards against. If the line is absent, omit the claim entirely. Never run `git log`, `git branch`, or any side git command outside the rake invocation to reconstruct provenance.
 - **Never** declare "no side effects" or "prereq abort" from rake stdout / exit code alone. The default pipeline rescues each `update:*` task individually (`UpdateRunner`), so non-zero exits routinely coexist with real bookmark / DB / esa writes. Ground truth is `db/last_run.yml` (bookmark deltas), `bundle exec rake db:stats` (memories count delta), and `bundle exec rake esa:find_duplicates DATE=<date>` (post deltas). Cross-check these before reporting a run as a no-op.
 - If the working directory does not exist or `Gemfile.lock` is missing, stop and report — do not try to bootstrap.
