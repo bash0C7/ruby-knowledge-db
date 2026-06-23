@@ -9,7 +9,8 @@ export const meta = {
   ],
 }
 
-const REPO = '/Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db'
+const REPO     = '/Users/bash/dev/src/github.com/bash0C7/ruby-knowledge-db'
+const LOCKFILE = `${REPO}/tmp/longrun/RUNNING`
 
 // ── Stage 1: Preflight (model: haiku) ──────────────────────────────────────
 
@@ -19,9 +20,9 @@ const PREFLIGHT_SCHEMA = {
   type: 'object',
   required: ['status'],
   properties: {
-    status:               { type: 'string', enum: ['ok', 'locked', 'inconsistent'] },
-    since:                { type: 'string', description: 'YYYY-MM-DD' },
-    before:               { type: 'string', description: 'YYYY-MM-DD' },
+    status:                { type: 'string', enum: ['ok', 'locked', 'inconsistent'] },
+    since:                 { type: 'string', description: 'YYYY-MM-DD' },
+    before:                { type: 'string', description: 'YYYY-MM-DD' },
     contradiction_reasons: { type: 'array', items: { type: 'string' } },
   },
 }
@@ -32,7 +33,7 @@ const preflight = await agent(
 Working directory: ${REPO}
 
 Step 1: Check lockfile
-Run: test -f ${REPO}/tmp/longrun/RUNNING
+Run: test -f ${LOCKFILE}
 If exit code is 0 (file exists), return JSON: { "status": "locked" }
 
 Step 2: Run rake plan
@@ -65,16 +66,47 @@ const { since, before } = preflight
 log(`Preflight OK — SINCE=${since} BEFORE=${before}`)
 
 // ── Stage 2: Launch (model: haiku) ─────────────────────────────────────────
+// Lockfile is written by JS here so cleanup is always possible on error.
 
 phase('Launch')
+
+// Generate timestamp and paths in JS so the tmux command is fully resolved.
+const now = new Date()
+const ts  = now.getFullYear().toString() +
+  String(now.getMonth() + 1).padStart(2, '0') +
+  String(now.getDate()).padStart(2, '0') +
+  '-' +
+  String(now.getHours()).padStart(2, '0') +
+  String(now.getMinutes()).padStart(2, '0') +
+  String(now.getSeconds()).padStart(2, '0')
+
+const session = `rkdb-default-${ts}`
+const logPath = `${REPO}/tmp/longrun/${session}.log`
+
+// Construct the fully-resolved tmux command in JS.
+// Shell variables ($HOME, $PATH, $?, $(…)) are escaped so they are NOT
+// expanded by JavaScript but ARE expanded by the inner bash -c shell.
+const tmuxCmd = `tmux new-session -d -s ${session} 'bash -c "cd ${REPO}; export PATH=\$HOME/.rbenv/shims:\$HOME/.rbenv/bin:\$PATH; { echo ENV which bundle: \$(which bundle); ruby -v; } > ${logPath} 2>&1; APP_ENV=production SINCE=${since} BEFORE=${before} bundle exec rake >> ${logPath} 2>&1; echo DONE: exit=\$? finished_at=\$(date -Iseconds) >> ${logPath}"'`
+
+// Write lockfile in JS so we can always clean it up on error.
+const lockSetup = await agent(
+  `Write the lockfile and create its directory.
+Run: mkdir -p ${REPO}/tmp/longrun
+Run: echo running > ${LOCKFILE}
+Return JSON: { "done": true }`,
+  { label: 'lockfile-write', phase: 'Launch', model: 'haiku', schema: { type: 'object', required: ['done'], properties: { done: { type: 'boolean' } } } }
+)
+
+if (!lockSetup?.done) {
+  log('ERROR: could not write lockfile')
+  return { status: 'error', reason: 'lockfile write failed', since, before }
+}
 
 const LAUNCH_SCHEMA = {
   type: 'object',
   required: ['status'],
   properties: {
     status:      { type: 'string', enum: ['ok', 'rbenv_error'] },
-    session:     { type: 'string' },
-    logPath:     { type: 'string' },
     preMemories: { type: 'integer' },
     preBookmark: { type: 'string' },
     rbenvCheck:  { type: 'string' },
@@ -85,58 +117,48 @@ const launch = await agent(
   `You are launching the ruby-knowledge-db pipeline in a detached tmux session.
 
 Working directory: ${REPO}
-SINCE: ${since}
-BEFORE: ${before}
 
-Step 1: Create lockfile directory and write lockfile
-Run: mkdir -p ${REPO}/tmp/longrun
-Run: echo running > ${REPO}/tmp/longrun/RUNNING
-
-Step 2: Get pre-run memory count
+Step 1: Get pre-run memory count
 Run: cd ${REPO} && APP_ENV=production bundle exec rake db:stats
 Extract the "memories total: N" line. Store N as preMemories integer.
 
-Step 3: Read bookmark
+Step 2: Read bookmark
 Run: cat ${REPO}/db/last_run.yml
 Store the full content as preBookmark string.
 
-Step 4: Generate timestamp and paths
-Run: date +%Y%m%d-%H%M%S
-Use the output as TIMESTAMP.
-session = "rkdb-default-TIMESTAMP"
-logPath = "${REPO}/tmp/longrun/rkdb-default-TIMESTAMP.log"
+Step 3: Launch detached tmux session
+Run this exact command:
+  ${tmuxCmd}
 
-Step 5: Launch detached tmux session
-Run exactly this command (substituting SINCE, BEFORE, LOG, SESSION with actual values):
-  tmux new-session -d -s SESSION 'bash -c "cd ${REPO}; export PATH=$HOME/.rbenv/shims:$HOME/.rbenv/bin:$PATH; { echo ENV which bundle: $(which bundle); ruby -v; } > LOG 2>&1; APP_ENV=production SINCE=SINCE BEFORE=BEFORE bundle exec rake >> LOG 2>&1; echo DONE: exit=$? finished_at=$(date -Iseconds) >> LOG"'
-
-Step 6: Wait 3 seconds then verify rbenv
-Run: sleep 3 && head -2 LOG
-Check if the output contains "/usr/bin/bundle". If it does, return: { "status": "rbenv_error", "rbenvCheck": "<first 2 lines>" }
+Step 4: Wait 3 seconds then verify rbenv
+Run: sleep 3 && head -2 ${logPath}
+If the output contains "/usr/bin/bundle", return: { "status": "rbenv_error", "rbenvCheck": "<first 2 lines>" }
 
 If all OK, return:
 {
   "status": "ok",
-  "session": "SESSION",
-  "logPath": "LOG",
-  "preMemories": preMemories,
-  "preBookmark": "full content of last_run.yml",
+  "preMemories": <integer>,
+  "preBookmark": "<full content of last_run.yml>",
   "rbenvCheck": "<first 2 lines of log>"
 }`,
   { label: 'launch', phase: 'Launch', model: 'haiku', schema: LAUNCH_SCHEMA }
 )
 
-if (!launch) {
-  log('ERROR: launch agent failed')
-  return { status: 'error', reason: 'launch agent failed', since, before }
-}
-
-if (launch.status === 'rbenv_error') {
+if (!launch || launch.status === 'rbenv_error') {
+  // Clean up lockfile before aborting.
+  await agent(
+    `Delete the lockfile: run rm -f ${LOCKFILE}. Return JSON: { "done": true }`,
+    { label: 'lockfile-cleanup', phase: 'Launch', model: 'haiku', schema: { type: 'object', required: ['done'], properties: { done: { type: 'boolean' } } } }
+  )
+  if (!launch) {
+    log('ERROR: launch agent failed — lockfile cleaned up')
+    return { status: 'error', reason: 'launch agent failed', since, before }
+  }
   log(`ABORTED: rbenv 設定が失敗しました。ログ: ${launch.rbenvCheck}`)
   return { status: 'aborted', reason: 'rbenv error', rbenvCheck: launch.rbenvCheck }
 }
 
-const { session, logPath, preMemories, preBookmark } = launch
+const { preMemories, preBookmark } = launch
 log(`Launched tmux session: ${session}`)
 log(`Log: ${logPath}`)
 log(`PRE memories: ${preMemories}`)
@@ -162,7 +184,8 @@ let exitCode           = null
 
 while (!done) {
   if (Date.now() - startTime > TIMEOUT_MS) {
-    log(`パイプライン完了待ちがタイムアウトしました (120分)。${logPath} を確認してください。`)
+    // Leave RUNNING in place — tmux session may still be running.
+    log(`パイプライン完了待ちがタイムアウトしました (120分)。${logPath} を確認し、完了後に tmp/longrun/RUNNING を手動で削除してから再実行してください。`)
     return { status: 'timeout', logPath, session, since, before }
   }
 
@@ -197,7 +220,7 @@ const POSTCHECK_SCHEMA = {
   type: 'object',
   required: ['status'],
   properties: {
-    status:        { type: 'string' },
+    status:        { type: 'string', enum: ['ok', 'failed'] },
     postMemories:  { type: 'integer' },
     delta:         { type: 'integer' },
     esaPosts:      { type: 'string' },
@@ -219,7 +242,7 @@ Session: ${session}
 
 Step 1: Handle non-zero exit
 If exit code is not "0":
-  - Run: rm -f ${REPO}/tmp/longrun/RUNNING
+  - Run: rm -f ${LOCKFILE}
   - Run: tail -50 ${logPath}
   - Return: { "status": "failed", "logTail": "<last 50 lines>" }
 
@@ -236,12 +259,12 @@ Run: cd ${REPO} && APP_ENV=production bundle exec rake esa:find_duplicates
 Store full output as esaDuplicates.
 
 Step 5: Extract from log
-Run: grep "esa: #" ${logPath} (ESA post lines)
-Run: grep "ERROR in update:" ${logPath} (failure lines)
-Run: grep "\\[trunk-changes\\]" ${logPath} (provenance lines)
+Run: grep "esa: #" ${logPath}
+Run: grep "ERROR in update:" ${logPath}
+Run: grep "\\[trunk-changes\\]" ${logPath}
 
 Step 6: Delete lockfile
-Run: rm -f ${REPO}/tmp/longrun/RUNNING
+Run: rm -f ${LOCKFILE}
 
 Step 7: Compute delta = postMemories - ${preMemories}
 
@@ -291,5 +314,4 @@ return {
   failures,
   pollutionScan,
   esaDuplicates,
-  preBookmark,
 }
