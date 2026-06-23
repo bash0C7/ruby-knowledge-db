@@ -78,57 +78,23 @@ Based on the confirmed intent:
 
 | Menu choice | Dispatch target                                                           |
 |-------------|---------------------------------------------------------------------------|
-| 1. 取り込み   | `ruby-knowledge-db-run` subagent (PLAN first, then CONFIRMED/AUTOCONFIRM on approval) |
+| 1. 取り込み (`rake` / `generate:<*_trunk>`) | `/rkdb-daily` workflow — invoke directly, no rake plan pre-fetch needed |
+| 1. 取り込み (非trunk `update:*`) | `ruby-knowledge-db-run` subagent (PLAN then CONFIRMED) |
 | 2. 確認      | `ruby-knowledge-db-inspect` subagent (direct, no gate)                    |
 | 3. 掃除      | `ruby-knowledge-db-run` subagent (TASK=db:delete_polluted or esa:delete, PLAN then CONFIRMED) |
 | 4. rake -T  | Print the `rake -T` output you already fetched in step 1 — no subagent    |
 | 5. その他    | Treat as free-form; re-ask clarification, or route to whichever subagent fits once clarified |
 
-#### For `ruby-knowledge-db-run` dispatches (choices 1 and 3)
+#### For pipeline dispatches (choice 1 — `rake default` / `generate:<*_trunk>`)
 
-**Pipeline tasks (`default`, `generate:<*_trunk>`)** have a fast path. Before dispatching, run `rake plan` via the inspect-agent (or directly in the main session — it's read-only):
+Invoke `/rkdb-daily` workflow. Do NOT call `ruby-knowledge-db-run` for pipeline tasks.
 
-```
-INTENT=plan [SINCE=...] [BEFORE=...] [APP_ENV=production]
-```
+Before invoking, echo once:
+→ 「daily pipeline を /rkdb-daily ワークフローで実行します (SINCE/BEFORE は Workflow Stage 1 が rake plan から解決)」
 
-Parse the JSON output's `consistent` field:
+Then invoke `/rkdb-daily`.
 
-- **`consistent: true`** → echo SINCE/BEFORE to the user (step 4 confirmation), then dispatch with **`AUTOCONFIRM`** in one shot (no separate PLAN round-trip):
-
-  ```
-  AUTOCONFIRM TASK=<task> SINCE=<plan.since> BEFORE=<plan.before> APP_ENV=<v>
-  ```
-
-- **`consistent: false`** → relay `contradiction_reasons` verbatim to the user. Wait for the user to either (a) fix the underlying issue (e.g. `rake esa:delete IDS=...`) and re-invoke `/ruby-knowledge-db`, or (b) explicitly approve a forced run, in which case dispatch with **`CONFIRMED ... RKDB_FORCE=1`**.
-
-##### Detached pattern monitoring (Pattern B follow-up)
-
-Pipeline tasks (`default`, `generate:<*_trunk>`) run **detached via `screen -dmS`** because they regularly exceed Bash's 10-min timeout. The run-agent returns immediately after launching screen, with a report shaped like:
-
-```
-## ruby-knowledge-db-run EXECUTE — launched (pattern=detached)
-- SESSION: rkdb-default-20260523-010532
-- LOG:     tmp/longrun/rkdb-default-20260523-010532.log
-- PRE state captured: memories=3653, bookmark={...}
-```
-
-When the run-agent returns this shape, do NOT relay it to the user as "done". Instead:
-
-1. Tell the user the pipeline is running detached and that you'll wait for completion.
-2. Launch a background Bash watcher to wait for the `DONE:` sentinel:
-   ```bash
-   until grep -q "^DONE:" tmp/longrun/<session>.log 2>/dev/null; do sleep 30; done
-   echo "RAKE_DONE: $(date -Iseconds)"
-   ```
-   Use `run_in_background: true`. You'll be notified when it completes.
-3. After the notification, re-dispatch the run-agent with `POSTCHECK` to verify state delta + run pollution scan:
-   ```
-   POSTCHECK LOG=tmp/longrun/<session>.log SESSION=<session> PRE_MEMORIES=<n> PRE_BOOKMARK=<inline yaml/json from the launched report>
-   ```
-4. Relay the POSTCHECK report to the user (memories delta, per-update success/fail, esa posts, pollution candidates).
-
-**Hard rule for the router**: only ONE detached pipeline run may be in flight at a time. If the user invokes `/ruby-knowledge-db` again before the previous run's POSTCHECK has finished, surface the in-flight session and wait — do not launch a second screen.
+The Workflow handles everything: preflight (rake plan + consistent check), lockfile guard, tmux launch, completion wait, and postcheck. If `consistent: false`, the Workflow aborts with contradiction reasons — surface that message to the user and wait for manual resolution. Do NOT attempt to recover, retry, or use RKDB_FORCE from this command.
 
 **Destructive tasks (`db:delete_polluted`, `esa:delete`) and non-trunk `update:*`** still use the legacy two-step PLAN → CONFIRMED flow with **foreground execution** (Pattern A). First invocation:
 
@@ -160,12 +126,13 @@ When the subagent returns, relay its output back to the user. Keep it concise �
 
 ## Hard rules
 
-- **Never** execute `rake` / `rake update:*` / `rake generate:*` / `rake import:*` / `rake esa:*` / `rake db:delete_*` / `rake esa:delete` yourself from the main session — always go through `ruby-knowledge-db-run`.
+- **Never** execute `rake` / `rake update:*` / `rake generate:*` / `rake import:*` / `rake esa:*` / `rake db:delete_*` / `rake esa:delete` yourself from the main session — always go through the appropriate subagent or workflow.
 - **Never** run ad-hoc write queries against `db/ruby_knowledge.db` yourself — delegate to subagents.
 - **Step 4 (confirm understanding)** rules:
-  - **Pipeline tasks with `rake plan` → `consistent: true`**: fast path. Echo the resolved SINCE/BEFORE in one line, then `AUTOCONFIRM` dispatch in the same turn. The explicit "OK?" wait is intentionally dropped — the user can interrupt before the subagent finishes if the parameters look wrong.
-  - **Pipeline tasks with `consistent: false`, destructive tasks (db:delete_polluted / esa:delete), and ambiguous intents**: full confirmation loop — echo, wait for user approval, then `CONFIRMED` dispatch.
-  - **Always** echo the parameters at least once before any dispatch, even on the fast path. No silent execution.
+  - **Pipeline tasks**: echo the one-line intent, then invoke `/rkdb-daily` — the Workflow resolves SINCE/BEFORE via rake plan internally.
+  - **Destructive tasks (db:delete_polluted / esa:delete) and ambiguous intents**: full confirmation loop — echo, wait for user approval, then `CONFIRMED` dispatch.
+  - **Always** echo the intent at least once before any dispatch. No silent execution.
 - **`rake -T`, `rake plan`, and `rake db:stats`** may be run directly in the main session (all read-only). Anything else: delegate.
+- **Pipeline tasks (`rake`, `generate:<*_trunk>`) は必ず `/rkdb-daily` Workflow 経由**。`ruby-knowledge-db-run` への直接 pipeline dispatch は禁止。`rake plan` を自分で先に取得する必要もない（Workflow Stage 1 が担当）。
 
 User arguments (optional): $ARGUMENTS
