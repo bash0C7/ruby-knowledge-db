@@ -70,7 +70,9 @@ Whether intent came from `$ARGUMENTS` (step 2) or the menu (step 3), echo back y
    （例: rake daily 相当の全パイプラインを昨日分で実行、SINCE/BEFORE は subagent が bookmark から計算）
 ```
 
-Wait for user approval. If the user adjusts, update and re-confirm.
+For **pipeline tasks** (`rake` / `generate:<*_trunk>`): after echoing, proceed directly to dispatch — do not wait for approval. The Workflow owns the `consistent: false` abort; the user can interrupt before the Workflow starts if the intent looks wrong.
+
+For **destructive tasks** (`db:delete_polluted`, `esa:delete`) and **ambiguous intents**: wait for user approval. If the user adjusts, update and re-confirm.
 
 ### 5. Dispatch
 
@@ -85,7 +87,7 @@ Based on the confirmed intent:
 | 4. rake -T  | Print the `rake -T` output you already fetched in step 1 — no subagent    |
 | 5. その他    | Treat as free-form; re-ask clarification, or route to whichever subagent fits once clarified |
 
-#### For pipeline dispatches (choice 1 — `rake default` / `generate:<*_trunk>`)
+#### For pipeline dispatches (choice 1 — `rake` / `generate:<*_trunk>`)
 
 Invoke `/rkdb-daily` workflow. Do NOT call `ruby-knowledge-db-run` for pipeline tasks.
 
