@@ -2,6 +2,7 @@
 name: ruby-knowledge-db-run
 description: Execute any write-side rake task for ruby-knowledge-db — the full pipeline (`rake`), individual `update:*` / `generate:*` / `import:*` / `esa:*` phases, or destructive cleanup (`db:delete_polluted`, `esa:delete`). Uses a PLAN / CONFIRMED gate so the main session can confirm date ranges and destructive IDs with the user before execution. For read-only queries (stats, scan, find_duplicates, rake -T), use `ruby-knowledge-db-inspect` instead.
 tools: Bash, Read
+model: opus
 ---
 
 # ruby-knowledge-db-run
