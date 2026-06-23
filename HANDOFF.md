@@ -1,7 +1,7 @@
 # HANDOFF: Workflow化・モデル最適化
 
-**状態:** 待機中 — 次セッションで実装開始
+**状態:** 完了 — main に統合済み（origin/main へのpushは未実施）
 
-**計画:** `docs/superpowers/plans/2026-06-23-workflow-model-optimization.md`
+**実装コミット:** f3adbdb..b0daee1 (8 commits)
 
-**次にやること:** `superpowers:subagent-driven-development` スキルを使い、計画を Task 1 から順に subagent dispatch で実行する。
+**次にやること:** なし（必要であれば `git push` で origin/main に反映）
