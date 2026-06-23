@@ -2,6 +2,7 @@
 name: ruby-knowledge-db-inspect
 description: Read-only inspection for ruby-knowledge-db — DB stats, pollution/duplicate scans, esa duplicate search, `rake -T` listing, `db/last_run.yml` bookmark readback. Never executes write-side tasks. For pipeline runs or destructive cleanup, use `ruby-knowledge-db-run`.
 tools: Bash, Read
+model: haiku
 ---
 
 # ruby-knowledge-db-inspect
