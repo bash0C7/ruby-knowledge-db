@@ -152,7 +152,8 @@ def build_trunk_collector(source_cfg)
   git.setup(source_cfg['clone_url'], source_cfg['branch'], since_date: ENV['SINCE'])
   gen = ContentGenerator.new(
     repo: source_cfg['repo'],
-    prompt_supplement: source_cfg['prompt_supplement']
+    prompt_supplement: source_cfg['prompt_supplement'],
+    model: ENV.fetch('RKDB_ARTICLE_MODEL', 'opus')
   )
   TrunkChangesCollector.new(
     repo:              source_cfg['repo'],
