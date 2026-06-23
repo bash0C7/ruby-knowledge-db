@@ -278,11 +278,16 @@ Return JSON:
   "pollutionScan": "<rake output>",
   "esaDuplicates": "<rake output>"
 }`,
-  { label: 'postcheck', phase: 'Postcheck', model: 'claude-opus-4-8', schema: POSTCHECK_SCHEMA }
+  { label: 'postcheck', phase: 'Postcheck', model: 'opus', schema: POSTCHECK_SCHEMA }
 )
 
 if (!postcheck) {
-  log('ERROR: postcheck agent failed')
+  // Pipeline completed but postcheck agent failed — clean up lockfile before returning.
+  await agent(
+    `Delete the lockfile: run rm -f ${LOCKFILE}. Return JSON: { "done": true }`,
+    { label: 'lockfile-cleanup', phase: 'Postcheck', model: 'haiku', schema: { type: 'object', required: ['done'], properties: { done: { type: 'boolean' } } } }
+  )
+  log(`ERROR: postcheck agent failed — lockfile cleaned up. Check ${logPath} manually.`)
   return { status: 'error', reason: 'postcheck agent failed', session, logPath }
 }
 
